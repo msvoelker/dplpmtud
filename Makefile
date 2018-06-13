@@ -1,9 +1,7 @@
 
 #CC = cc -std=c11 -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal -Wshadow -Wpointer-arith -Wunreachable-code -Winit-self -Wno-unreachable-code
 
-
-CC = cc -std=c11 -O2 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal -Wshadow -Wpointer-arith -Winit-self -Wno-unused-function -Wno-unused-parameter -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments
-
+CC = cc -std=c11 -O2 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal -Wshadow -Wpointer-arith -Winit-self -Wno-unused-function -Wno-unused-parameter -Wno-variadic-macros
 
 
 all : client server

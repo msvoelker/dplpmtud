@@ -22,6 +22,7 @@ int create_socket(int is_server, char *hostname, char *service, struct addrinfo 
 		return -1;
 	}
 
+	socketDesc = -1;
 	//printf( "Rechner %s (%s) ...\n", hostname, ai->ai_canonname );
 	for (addressInfo = addressInfos; addressInfo != NULL; addressInfo = addressInfo->ai_next) {
 		fprintf(stderr, "found address info\n");

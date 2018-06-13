@@ -42,7 +42,7 @@
 
 static uint32_t probe_size;
 static uint32_t probed_size_success;
-static pthread_t main_thread_id = NULL;
+static pthread_t main_thread_id = 0;
 static pthread_t listener_thread_id;
 static pthread_t prober_thread_id;
 static pthread_t ptb_listener_thread_id;
@@ -80,7 +80,7 @@ static void increment_probe_sequence_number() {
 }
 
 static int do_probe() {
-	LOG_DEBUG("%s - do_probe entered", THREAD_NAME);
+	LOG_DEBUG_("%s - do_probe entered", THREAD_NAME);
 	uint32_t probe_count;
 	struct timespec stop_time;
 	struct timeval now;
@@ -88,45 +88,45 @@ static int do_probe() {
 	probe_count = 0;
 	
 	pthread_mutex_lock(&probe_return_mutex);
-	LOG_DEBUG("%s - mutex locked", THREAD_NAME);
+	LOG_DEBUG_("%s - mutex locked", THREAD_NAME);
 	while (probe_count < MAX_PROBES) {
 		increment_probe_sequence_number();
 		probe_return = 0;
-		LOG_INFO("%s - probe %u bytes with seq_no= %u", THREAD_NAME, probe_size, probe_sequence_number);
+		LOG_INFO_("%s - probe %u bytes with seq_no= %u", THREAD_NAME, probe_size, probe_sequence_number);
 		probe_count++;
 		if (send_probe(dplpmtud_socket, probe_size) < 0) {
-			LOG_PERROR("%s - send_probe", THREAD_NAME);
+			LOG_PERROR_("%s - send_probe", THREAD_NAME);
 		} else {
-			LOG_DEBUG("%s - cond wait", THREAD_NAME);
+			LOG_DEBUG_("%s - cond wait", THREAD_NAME);
 			gettimeofday(&now, NULL);
 			stop_time.tv_sec = now.tv_sec+PROBE_TIMEOUT;
 			stop_time.tv_nsec = now.tv_usec * 1000;
 			pthread_cond_timedwait(&probe_return_cond, &probe_return_mutex, &stop_time); 
 		}
-		LOG_DEBUG("%s - probe_return == %d", THREAD_NAME, probe_return);
+		LOG_DEBUG_("%s - probe_return == %d", THREAD_NAME, probe_return);
 		if (probe_return == 1) { /* heartbeat response received */
-			LOG_INFO("%s - probe with %u bytes succeeded", THREAD_NAME, probe_size);
+			LOG_INFO_("%s - probe with %u bytes succeeded", THREAD_NAME, probe_size);
 			probed_size_success = probe_size;
 			
 			pthread_mutex_unlock(&probe_return_mutex);
-			LOG_DEBUG("%s - leave do_probe", THREAD_NAME);
+			LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
 			return 1;
 		} else if (probe_return > 1) { /* valid PTB received */
 			ptb_mtu = probe_return;
 			pthread_mutex_unlock(&probe_return_mutex);
-			LOG_DEBUG("%s - leave do_probe", THREAD_NAME);
+			LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
 			return 2;
 		} 
 	}
 	pthread_mutex_unlock(&probe_return_mutex);
-	LOG_INFO("%s - probe with %u bytes failed", THREAD_NAME, probe_size);
-	LOG_DEBUG("%s - leave do_probe", THREAD_NAME);
+	LOG_INFO_("%s - probe with %u bytes failed", THREAD_NAME, probe_size);
+	LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
 	return 0;
 }
 
 static int is_raise_timer_expired(time_t raise_timer_start) {
 	if ((time(NULL) - raise_timer_start) >= RAISE_TIMEOUT) {
-		LOG_DEBUG("%s - RAISE_TIMER expired", THREAD_NAME);
+		LOG_DEBUG_("%s - RAISE_TIMER expired", THREAD_NAME);
 		return 1;
 	}
 	return 0;
@@ -149,24 +149,24 @@ static uint32_t get_ptb_mtu_limit() {
 int signal_probe_return() {
 	pthread_mutex_lock(&probe_return_mutex);
 	probe_return = 1;
-	LOG_DEBUG("%s - probe_return = 1", THREAD_NAME);
+	LOG_DEBUG_("%s - probe_return = 1", THREAD_NAME);
 	pthread_cond_signal(&probe_return_cond);
 	pthread_mutex_unlock(&probe_return_mutex);
 	return 1;
 }
 
 static int signal_probe_return_with_mtu(uint32_t mtu) {
-	LOG_DEBUG("%s - enter signal_probe_return_with_mtu", THREAD_NAME);
+	LOG_DEBUG_("%s - enter signal_probe_return_with_mtu", THREAD_NAME);
 	uint32_t mtu_limit;
 	mtu_limit = get_ptb_mtu_limit();
 	if ( !(mtu_limit == 0 || (1 < mtu && mtu < mtu_limit)) ) {
-		LOG_DEBUG("%s - do not signal probe return. %u, %u", THREAD_NAME, mtu, mtu_limit);
+		LOG_DEBUG_("%s - do not signal probe return. %u, %u", THREAD_NAME, mtu, mtu_limit);
 		return 0;
 	}
-	LOG_DEBUG("%s - signal probe return with mtu %u", THREAD_NAME, mtu);
+	LOG_DEBUG_("%s - signal probe return with mtu %u", THREAD_NAME, mtu);
 	pthread_mutex_lock(&probe_return_mutex);
 	probe_return = mtu;
-	LOG_DEBUG("%s - probe_return = %u", THREAD_NAME, mtu);
+	LOG_DEBUG_("%s - probe_return = %u", THREAD_NAME, mtu);
 	pthread_cond_signal(&probe_return_cond);
 	pthread_mutex_unlock(&probe_return_mutex);
 	return 1;
@@ -181,7 +181,7 @@ uint32_t get_probe_sequence_number() {
 }
 
 state_t run_base_state() {
-	LOG_DEBUG("%s - run_base_state entered", THREAD_NAME);
+	LOG_DEBUG_("%s - run_base_state entered", THREAD_NAME);
 	int probe_value;
 	
 	probe_size = BASE_PMTU;
@@ -199,7 +199,7 @@ state_t run_base_state() {
 				return DONE;
 			}
 	}
-	LOG_ERROR("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
+	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
 	return DISABLED;
 }
 
@@ -225,12 +225,12 @@ state_t run_search_state() {
 				max_pmtu = ptb_mtu;
 		}
 	}
-	LOG_ERROR("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
+	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
 	return DISABLED;
 }
 
 state_t run_done_state() {
-	LOG_DEBUG("%s - run_done_state entered", THREAD_NAME);
+	LOG_DEBUG_("%s - run_done_state entered", THREAD_NAME);
 	int probe_success;
 	time_t raise_timer_start;
 	
@@ -239,19 +239,19 @@ state_t run_done_state() {
 	raise_timer_start = time(NULL);
 	probe_success = 1;
 	while (probe_success) {
-		LOG_DEBUG("%s - sleep for REACHABILITY_TIMEOUT", THREAD_NAME);
+		LOG_DEBUG_("%s - sleep for REACHABILITY_TIMEOUT", THREAD_NAME);
 		sleep(REACHABILITY_TIMEOUT);
 		if (is_raise_timer_expired(raise_timer_start)) break;
 		probe_success = do_probe();
 		if (is_raise_timer_expired(raise_timer_start)) break;
 	}
 	
-	LOG_DEBUG("%s - leave run_done_state", THREAD_NAME);
+	LOG_DEBUG_("%s - leave run_done_state", THREAD_NAME);
 	return BASE;
 }
 
 state_t run_error_state() {
-	LOG_DEBUG("%s - run_error_state entered", THREAD_NAME);
+	LOG_DEBUG_("%s - run_error_state entered", THREAD_NAME);
 	int probe_success;
 	
 	probe_size = MIN_PMTU;
@@ -261,12 +261,12 @@ state_t run_error_state() {
 		probe_success = do_probe();
 	}
 	
-	LOG_DEBUG("%s - leave run_error_state", THREAD_NAME);
+	LOG_DEBUG_("%s - leave run_error_state", THREAD_NAME);
 	return SEARCH;
 }
 
 static void *listener(void *arg) {
-	LOG_DEBUG("%s - listener entered", THREAD_NAME);
+	LOG_DEBUG_("%s - listener entered", THREAD_NAME);
 	ssize_t recv_len;
 	char buf[BUFFER_SIZE];
 	struct sockaddr_storage from_addr;
@@ -279,28 +279,36 @@ static void *listener(void *arg) {
 		message_handler(dplpmtud_socket, buf, recv_len, (struct sockaddr *)&from_addr, from_addr_len);
 	}
 	
-	LOG_DEBUG("%s - leave listener", THREAD_NAME);
+	LOG_DEBUG_("%s - leave listener", THREAD_NAME);
 	return NULL;
 }
 
 static void *prober(void *arg) {
-	LOG_DEBUG("%s - prober entered", THREAD_NAME);
+	LOG_DEBUG_("%s - prober entered", THREAD_NAME);
 	state_t state;
 	int mtu;
 	
 	mtu = get_local_if_mtu(dplpmtud_socket);
 	if (mtu <= 0) {
-		LOG_ERROR("failed to get local interface MTU. Assume a MTU of %d", max_pmtu);
+		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", max_pmtu);
 	} else {
 		max_pmtu = mtu;
-		LOG_INFO("max_pmtu = mtu of local interface = %d", max_pmtu);
+		LOG_INFO_("max_pmtu = mtu of local interface = %d", max_pmtu);
 	}
 	int val = 1;
-	if (setsockopt(dplpmtud_socket, IPPROTO_IP, IP_DONTFRAG, &val, sizeof(val)) != 0) {
-		LOG_PERROR("setsockopt IP_DONTFRAG");
-	}
-	if (setsockopt(dplpmtud_socket, IPPROTO_IPV6, IPV6_DONTFRAG, &val, sizeof(val)) != 0) {
-		LOG_PERROR("setsockopt IPV6_DONTFRAG");
+	if (dplpmtud_ip_version == IPv4) {
+#ifdef __linux__
+		val = IP_PMTUDISC_PROBE;
+		if (setsockopt(dplpmtud_socket, IPPROTO_IP, IP_MTU_DISCOVER, &val, sizeof(val)) != 0) {
+#else
+		if (setsockopt(dplpmtud_socket, IPPROTO_IP, IP_DONTFRAG, &val, sizeof(val)) != 0) {
+#endif
+			LOG_PERROR("setsockopt IP_DONTFRAG");
+		}
+	} else {
+		if (setsockopt(dplpmtud_socket, IPPROTO_IPV6, IPV6_DONTFRAG, &val, sizeof(val)) != 0) {
+			LOG_PERROR("setsockopt IPV6_DONTFRAG");
+		}
 	}
 	
 	state = BASE;
@@ -308,12 +316,12 @@ static void *prober(void *arg) {
 		state = run_state(state);
 	}
 	
-	LOG_DEBUG("%s - leave prober", THREAD_NAME);
+	LOG_DEBUG_("%s - leave prober", THREAD_NAME);
 	return NULL;
 }
 
 static void *ptb_listener(void *arg) {
-	LOG_DEBUG("%s - ptb listener entered", THREAD_NAME);
+	LOG_DEBUG_("%s - ptb listener entered", THREAD_NAME);
 	struct sockaddr_storage addr;
 	socklen_t addrlen;
 	char buf[BUFFER_SIZE];
@@ -354,7 +362,7 @@ static void *ptb_listener(void *arg) {
 			
 			ip_header = (struct ip *) buf;
 			if (ntohs(ip_header->ip_len) != recv_len) {
-				LOG_DEBUG("did not receive the full ip packet. %d!=%zd", ntohs(ip_header->ip_len), recv_len);
+				LOG_DEBUG_("did not receive the full ip packet. %d!=%zd", ntohs(ip_header->ip_len), recv_len);
 				continue;
 			}
 			
@@ -387,12 +395,12 @@ static void *ptb_listener(void *arg) {
 	}
 	
 	close(icmp_socket);
-	LOG_DEBUG("%s - leave ptb listener", THREAD_NAME);
+	LOG_DEBUG_("%s - leave ptb listener", THREAD_NAME);
 	return NULL;
 }
 
 static void *controller(void *arg) {
-	LOG_DEBUG("%s - controller entered", THREAD_NAME);
+	LOG_DEBUG_("%s - controller entered", THREAD_NAME);
 	struct icmp6_filter icmp6_filt;
 	
 	if (!dplpmtud_passive_mode) {
@@ -410,41 +418,43 @@ static void *controller(void *arg) {
 				LOG_PERROR("could not create icmp socket.");
 			}
 			// release super user privilege
-			setuid(getuid());
+			if (setuid(getuid()) != 0) {
+				LOG_DEBUG_("%s - could not release super user privilege.", THREAD_NAME);
+			}
 			pthread_create(&ptb_listener_thread_id, NULL, ptb_listener, NULL);
 		}
 		pthread_create(&prober_thread_id, NULL, prober, NULL);
 	}
 	
 	listener_thread_id = main_thread_id;
-	LOG_DEBUG("%s - leave controller", THREAD_NAME);
+	LOG_DEBUG_("%s - leave controller", THREAD_NAME);
 	return listener(NULL);
 }
 
 pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int handle_ptb) {
-	LOG_DEBUG("%s - dplpmtud_start entered", THREAD_NAME);
-	if (main_thread_id != NULL) {
+	LOG_DEBUG_("%s - dplpmtud_start entered", THREAD_NAME);
+	if (main_thread_id != 0) {
 		// dplpmtud thread already started
-		LOG_INFO("%s - dplpmtud thread already started", THREAD_NAME);
-		LOG_DEBUG("%s - leave dplpmtud_start", THREAD_NAME);
-		return NULL;
+		LOG_INFO_("%s - dplpmtud thread already started", THREAD_NAME);
+		LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
+		return 0;
 	}
 	if (address_family == AF_INET) {
 		dplpmtud_ip_version = IPv4;
 	} else if (address_family == AF_INET6) {
 		dplpmtud_ip_version = IPv6;
 	} else {
-		LOG_ERROR("%s - unknown address family", THREAD_NAME);
-		LOG_DEBUG("%s - leave dplpmtud_start", THREAD_NAME);
-		return NULL;
+		LOG_ERROR_("%s - unknown address family", THREAD_NAME);
+		LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
+		return 0;
 	}
 	dplpmtud_socket = socket;
-	probe_return_mutex = PTHREAD_MUTEX_INITIALIZER;
-	probe_return_cond = PTHREAD_COND_INITIALIZER;
+	probe_return_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+	probe_return_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
 	probe_return = 0;
-	probe_sequence_number_mutex = PTHREAD_MUTEX_INITIALIZER;
+	probe_sequence_number_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 	probe_sequence_number = 0;
-	ptb_mtu_limit_mutex = PTHREAD_MUTEX_INITIALIZER;
+	ptb_mtu_limit_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 	ptb_mtu_limit = 1;
 	
 	dplpmtud_passive_mode = passive_mode;
@@ -455,14 +465,14 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 	}
 	
 	pthread_create(&main_thread_id, NULL, controller, NULL);
-	LOG_DEBUG("%s - leave dplpmtud_start", THREAD_NAME);
+	LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
 	return main_thread_id;
 }
 
 void dplpmtud_wait() {
-	LOG_DEBUG("%s - dplpmtud_wait entered", THREAD_NAME);
-	if (main_thread_id != NULL) {
+	LOG_DEBUG_("%s - dplpmtud_wait entered", THREAD_NAME);
+	if (main_thread_id != 0) {
 		pthread_join(main_thread_id, NULL);
 	}
-	LOG_DEBUG("%s - leave dplpmtud_wait", THREAD_NAME);
+	LOG_DEBUG_("%s - leave dplpmtud_wait", THREAD_NAME);
 }

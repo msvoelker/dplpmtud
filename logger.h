@@ -18,29 +18,39 @@
 #define LOG_FORMAT "%ld %-5s %s:%d - "
 
 #if LOG_LEVEL <= LOG_LEVEL_NOLOG
-#define LOG_(stream, tag, message, args...) fprintf(stream, LOG_FORMAT message "\n", time(NULL), tag, __FILE__, __LINE__, ## args);
+#define LOG_(stream, tag, message) fprintf(stream, LOG_FORMAT message "\n", time(NULL), tag, __FILE__, __LINE__);
+#define LOG__(stream, tag, message, ...) fprintf(stream, LOG_FORMAT message "\n", time(NULL), tag, __FILE__, __LINE__, __VA_ARGS__);
 #else
 #define LOG_(stream, tag, message, ...)
+#define LOG__(stream, tag, message, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
-#define LOG_DEBUG(message, args...) LOG_(stdout, "DEBUG", message, ## args)
+#define LOG_DEBUG(message) LOG_(stdout, "DEBUG", message)
+#define LOG_DEBUG_(message, ...) LOG__(stdout, "DEBUG", message, __VA_ARGS__)
 #else
-#define LOG_DEBUG(message, args...)
+#define LOG_DEBUG(message)
+#define LOG_DEBUG_(message, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_INFO
-#define LOG_INFO(message, args...) LOG_(stdout, "INFO", message, ## args)
+#define LOG_INFO(message) LOG_(stdout, "INFO", message)
+#define LOG_INFO_(message, ...) LOG__(stdout, "INFO", message, __VA_ARGS__)
 #else
-#define LOG_INFO(message, args...)
+#define LOG_INFO(message)
+#define LOG_INFO_(message, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
-#define LOG_ERROR(message, args...) LOG_(stderr, "ERROR", message, ## args)
-#define LOG_PERROR(message, args...) LOG_(stderr, "ERROR", "%s: " message, strerror(errno), ## args)
+#define LOG_ERROR(message) LOG_(stderr, "ERROR", message)
+#define LOG_ERROR_(message, ...) LOG__(stderr, "ERROR", message, __VA_ARGS__)
+#define LOG_PERROR(message) LOG__(stderr, "ERROR", "%s: " message, strerror(errno))
+#define LOG_PERROR_(message, ...) LOG__(stderr, "ERROR", "%s: " message, strerror(errno), __VA_ARGS__)
 #else
-#define LOG_ERROR(message, args...)
-#define LOG_PERROR(message, args...)
+#define LOG_ERROR(message)
+#define LOG_ERROR_(message, ...)
+#define LOG_PERROR(message)
+#define LOG_PERROR_(message, ...)
 #endif
 
 #endif /* LOGGER_H */
