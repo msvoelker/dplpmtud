@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 	//addr_hints.ai_protocol = IPPROTO_UDP;
 	
 	socket = create_socket(1, argv[1], argv[2], &addr_hints, &addressInfos, sizeof(struct addrinfo));
-	dplpmtud_start(socket, addressInfos.ai_family, 1);
+	dplpmtud_start(socket, addressInfos.ai_family, 1, 0);
 	dplpmtud_wait();
 	return 0;
 }

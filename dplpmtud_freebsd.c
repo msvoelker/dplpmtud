@@ -10,14 +10,34 @@
 #include "logger.h"
 
 // get source address for connected socket.
-static int get_src_addr(int connected_socket, struct sockaddr_storage *sa) {
-	socklen_t addrlen;
+int get_src_addr(int connected_socket, struct sockaddr_storage *sa, socklen_t *addrlen) {
+	socklen_t len;
 	
-	addrlen = sizeof(struct sockaddr_storage);
+	len = sizeof(struct sockaddr_storage);
 	memset(sa, 0, sizeof(struct sockaddr_storage));
-	if (getsockname(connected_socket, (struct sockaddr *)sa, &addrlen) != 0) {
+	if (getsockname(connected_socket, (struct sockaddr *)sa, &len) != 0) {
 		LOG_PERROR("get_src_addr - getsockname");
 		return -1;
+	}
+	if (addrlen != NULL) {
+		*addrlen = len;
+	}
+	
+	return 0;
+}
+
+// get destination address for connected socket.
+static int get_dst_addr(int connected_socket, struct sockaddr_storage *sa, socklen_t *addrlen) {
+	socklen_t len;
+	
+	len = sizeof(struct sockaddr_storage);
+	memset(sa, 0, sizeof(struct sockaddr_storage));
+	if (getpeername(connected_socket, (struct sockaddr *)sa, &len) != 0) {
+		LOG_PERROR("get_dst_addr - getpeername");
+		return -1;
+	}
+	if (addrlen != NULL) {
+		*addrlen = len;
 	}
 	
 	return 0;
@@ -77,7 +97,7 @@ int get_local_if_mtu(int connected_socket) {
 	struct sockaddr_storage sa;
 	int mtu;
 	
-	if (get_src_addr(connected_socket, &sa) != 0) {
+	if (get_src_addr(connected_socket, &sa, NULL) != 0) {
 		return -1;
 	}
 	mtu = get_interface_mtu(connected_socket, (struct sockaddr *)&sa);

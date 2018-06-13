@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 
 	socket = create_socket(0, argv[1], argv[2], &addr_hints, &addressInfos, sizeof(struct addrinfo));
 	
-	dplpmtud_start(socket, addressInfos.ai_family, 0);
+	dplpmtud_start(socket, addressInfos.ai_family, 0, 1);
 	dplpmtud_wait();
 	
 	close(socket);

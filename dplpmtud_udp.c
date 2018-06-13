@@ -13,6 +13,9 @@
 #include "logger.h"
 #include "dplpmtud_pl.h"
 
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+
 #define IPv4_HEADER_SIZE 20
 // TODO assuming a fix IPv6 header size OK?
 #define IPv6_HEADER_SIZE 40
@@ -26,8 +29,8 @@ struct udp_heartbeat {
 	uint8_t type;
 	uint8_t flags;
 	uint16_t length;
-	uint32_t seq_no;
 	uint32_t token;
+	uint32_t seq_no;
 };
 
 static uint32_t token = 4711;
@@ -50,7 +53,7 @@ int send_probe(int socket, uint32_t probe_size) {
 	heartbeat_request = (struct udp_heartbeat *)udp_payload;
 	heartbeat_request->type = 4;
 	heartbeat_request->length = htons(12);
-	heartbeat_request->seq_no = probe_sequence_number;
+	heartbeat_request->seq_no = get_probe_sequence_number();
 	heartbeat_request->token = token;
 	
 	LOG_DEBUG("%s - leave send_probe", THREAD_NAME_SEND);
@@ -59,14 +62,13 @@ int send_probe(int socket, uint32_t probe_size) {
 
 // message specific 
 static int handle_heartbeat_response(struct udp_heartbeat *heartbeat_response) {
+	uint32_t seq_no;
+	
+	seq_no = get_probe_sequence_number();
 	LOG_DEBUG("%s - handle_heartbeat_response entered", THREAD_NAME_RECEIVE);
-	LOG_DEBUG("%s - heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", THREAD_NAME_RECEIVE, heartbeat_response->token, token, heartbeat_response->seq_no, probe_sequence_number);
-	if (heartbeat_response->token == token && heartbeat_response->seq_no == probe_sequence_number) {
-		heartbeat_response_received = 1;
-		LOG_DEBUG("%s - heartbeat_response_received = 1", THREAD_NAME_RECEIVE);
-		pthread_mutex_lock(&heartbeat_response_received_mutex);
-		pthread_cond_signal(&heartbeat_response_received_cond);
-		pthread_mutex_unlock(&heartbeat_response_received_mutex);
+	LOG_DEBUG("%s - heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", THREAD_NAME_RECEIVE, heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
+	if (heartbeat_response->token == token && heartbeat_response->seq_no == seq_no) {
+		signal_probe_return();
 		LOG_DEBUG("%s - leave handle_heartbeat_response", THREAD_NAME_RECEIVE);
 		return 1;
 	}
@@ -122,4 +124,59 @@ int message_handler(int socket, void *message, size_t message_length, struct soc
 	LOG_DEBUG("%s - leave message_handler", THREAD_NAME_RECEIVE);
 	return -1;
 	
+}
+
+int verify_ptb_token(void *udp_payload, size_t payload_length) {
+	struct udp_heartbeat *heartbeat_request;
+	
+	if (payload_length < 8) {
+		LOG_DEBUG("icmp message does not contain token, cannot verify. Only %ld bytes udp payload.", payload_length);
+		return 0;
+	}
+	
+	heartbeat_request = (struct udp_heartbeat *)udp_payload;
+	if (heartbeat_request->token != token) {
+		LOG_DEBUG("wrong token %u.", heartbeat_request->token);
+		return 0;
+	}
+	
+	return 1;
+}
+
+int verify_ptb4(char *icmp_payload, size_t payload_length) {
+	struct ip *ip_header;
+	
+	ip_header = (struct ip *) icmp_payload;
+	if (payload_length < 1 || ip_header->ip_v != IPVERSION) {
+		return 0;
+	}
+	
+	// verify -> compare token
+	return verify_ptb_token((icmp_payload + ip_header->ip_hl*4 + UDP_HEADER_SIZE), (payload_length - ip_header->ip_hl*4 - UDP_HEADER_SIZE));
+}
+
+int verify_ptb6(char *icmp_payload, size_t payload_length) {
+	struct ip6_hdr *ip_header;
+	char *next_header;
+	u_int8_t next_header_proto;
+	size_t length_left;
+	struct ip6_ext *ip_extheader;
+	
+	ip_header = (struct ip6_hdr *) icmp_payload;
+	if (payload_length < 8 || (ip_header->ip6_ctlun.ip6_un2_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+		return 0;
+	}
+	
+	length_left = payload_length;
+	next_header_proto = ip_header->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+	next_header = icmp_payload + IPv6_HEADER_SIZE;
+	length_left -= IPv6_HEADER_SIZE;
+	while (next_header_proto != IPPROTO_UDP && length_left >= 2) {
+		ip_extheader = (struct ip6_ext *)next_header;
+		next_header_proto = ip_extheader->ip6e_nxt;
+		next_header = next_header + ip_extheader->ip6e_len;
+		length_left -= ip_extheader->ip6e_len;
+	}
+	
+	return verify_ptb_token((next_header + UDP_HEADER_SIZE), (length_left - UDP_HEADER_SIZE));
 }
