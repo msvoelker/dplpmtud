@@ -12,7 +12,7 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include "logger.h"
-#include "dplpmtud_states.h"
+#include "dplpmtud_prober_states.h"
 #include "dplpmtud_pl.h"
 #include "dplpmtud_util.h"
 #include "dplpmtud_main.h"
@@ -169,6 +169,23 @@ uint32_t get_probe_sequence_number() {
 	return seq_no;
 }
 
+state_t run_start_state() {
+	LOG_DEBUG_("%s - run_start_state entered", THREAD_NAME);
+	int probe_value;
+	
+	probe_size = 0;
+	set_ptb_mtu_limit(0);
+	probe_value = do_probe();
+	if (probe_value == 1) { /* heartbeat response received */
+		LOG_INFO_("%s - connectivity confirmed", THREAD_NAME);
+		LOG_DEBUG_("%s - leave run_start_state", THREAD_NAME);
+		return BASE;
+	}
+	LOG_INFO_("%s - could not confirm connectivity -> disable PMTU", THREAD_NAME);
+	LOG_DEBUG_("%s - leave run_start_state", THREAD_NAME);
+	return DISABLED;
+}
+
 state_t run_base_state() {
 	LOG_DEBUG_("%s - run_base_state entered", THREAD_NAME);
 	int probe_value;
@@ -292,7 +309,7 @@ void *dplpmtud_prober(void *arg) {
 		}
 	}
 	
-	state = BASE;
+	state = START;
 	while (state != DISABLED) {
 		state = run_state(state);
 	}

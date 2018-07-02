@@ -13,14 +13,15 @@ typedef enum {
 //typedef struct instance_data instance_data_t;
 typedef state_t state_func_t(); //instance_data_t *data );
 
+state_t run_start_state();
 state_t run_base_state();
 state_t run_search_state();
 state_t run_error_state();
 state_t run_done_state();
 
 state_func_t* const state_table[] = {
-	NULL, 
-	NULL, 
+	run_start_state, 
+	NULL, // DISABLED state has no function
 	run_base_state, 
 	run_search_state, 
 	run_error_state, 
