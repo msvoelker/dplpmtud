@@ -1,19 +1,18 @@
 
 #include <pthread.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <unistd.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include "logger.h"
 #include "dplpmtud_main.h"
 #include "dplpmtud_prober.h"
 #include "dplpmtud_ptb_listener.h"
 #include "dplpmtud_listener.h"
-
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/icmp6.h>
 
 // TODO: increase probe_size better
 

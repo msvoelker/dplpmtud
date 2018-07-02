@@ -209,9 +209,15 @@ state_t run_search_state() {
 				increase_probe_size();
 				break;
 			case 2: /* PTB with MTU < probe_size */
-				//return BASE;
-				probe_size = ptb_mtu;
-				max_pmtu = ptb_mtu;
+				if (ptb_mtu < probed_size_success) {
+					return BASE;
+				} else if (ptb_mtu < probe_size) {
+					probe_size = ptb_mtu;
+					max_pmtu = ptb_mtu;
+				} else {
+					LOG_ERROR_("%s - got PTB interrupt in SEARCH state with ptb_mtu >= probe_size. %u %u", THREAD_NAME, ptb_mtu, probe_size);
+					return DISABLED;
+				}
 		}
 	}
 	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
@@ -220,23 +226,32 @@ state_t run_search_state() {
 
 state_t run_done_state() {
 	LOG_DEBUG_("%s - run_done_state entered", THREAD_NAME);
-	int probe_success;
+	int probe_value;
 	time_t raise_timer_start;
 	
 	set_ptb_mtu_limit(1);
 	probe_size = probed_size_success;
 	raise_timer_start = time(NULL);
-	probe_success = 1;
-	while (probe_success) {
+	probe_value = 1;
+	while (probe_value == 1) {
 		LOG_DEBUG_("%s - sleep for REACHABILITY_TIMEOUT", THREAD_NAME);
 		sleep(REACHABILITY_TIMEOUT);
-		if (is_raise_timer_expired(raise_timer_start)) break;
-		probe_success = do_probe();
-		if (is_raise_timer_expired(raise_timer_start)) break;
+		if (is_raise_timer_expired(raise_timer_start)) {
+			return SEARCH;
+		}
+		probe_value = do_probe();
+		if (probe_value == 0) { /* no response */
+			LOG_INFO_("%s - probe with confirmed size failed -> go back to BASE", THREAD_NAME);
+			LOG_DEBUG_("%s - leave run_done_state", THREAD_NAME);
+			return BASE;
+		}
+		if (is_raise_timer_expired(raise_timer_start)) {
+			return SEARCH;
+		}
 	}
 	
-	LOG_DEBUG_("%s - leave run_done_state", THREAD_NAME);
-	return BASE;
+	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
+	return DISABLED;
 }
 
 state_t run_error_state() {
