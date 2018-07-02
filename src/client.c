@@ -1,27 +1,23 @@
 #include <string.h>
-#include <sys/socket.h>
 #include <stdio.h>
-#include <netdb.h>
+#include <unistd.h>
+#include <sys/socket.h>
 #include "socket.h"
 #include "dplpmtud.h"
-
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <unistd.h>
-
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 int main(int argc, char **argv) {
 	struct addrinfo addr_hints;
 	int socket;
 	struct addrinfo addressInfos;
 	
+	if (argc < 3) {
+		fprintf(stderr, "call %s host port\n", argv[0]);
+		return 1;
+	}
+	
 	memset(&addr_hints, 0, sizeof(struct addrinfo));
 	addr_hints.ai_family = AF_UNSPEC;
-	addr_hints.ai_socktype = SOCK_DGRAM; //SOCK_RAW;
-	//addr_hints.ai_protocol = IPPROTO_UDP;
+	addr_hints.ai_socktype = SOCK_DGRAM;
 
 	socket = create_socket(0, argv[1], argv[2], &addr_hints, &addressInfos, sizeof(struct addrinfo));
 	

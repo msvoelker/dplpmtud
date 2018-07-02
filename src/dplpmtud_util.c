@@ -82,7 +82,7 @@ static int get_interface_mtu(int socket, struct sockaddr *if_addr) {
 		} else if (if_addr->sa_family == AF_INET6) {
 			if ( memcmp( (char *) &(((struct sockaddr_in6 *)if_addr)->sin6_addr.s6_addr),
 			             (char *) &(((struct sockaddr_in6 *)interface->ifa_addr)->sin6_addr.s6_addr),
-			             sizeof(((struct sockaddr_in6 *)if_addr)->sin6_addr.s6_addr)) ) {
+			             sizeof(((struct sockaddr_in6 *)if_addr)->sin6_addr.s6_addr)) == 0 ) {
 				mtu = get_mtu(socket, interface->ifa_name);
 				break;
 			}

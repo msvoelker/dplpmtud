@@ -11,7 +11,8 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include "logger.h"
-#include "dplpmtud_pl.h"
+#include "dplpmtud_main.h"
+#include "dplpmtud_prober.h"
 
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
@@ -163,12 +164,12 @@ int verify_ptb6(char *icmp_payload, size_t payload_length) {
 	struct ip6_ext *ip_extheader;
 	
 	ip_header = (struct ip6_hdr *) icmp_payload;
-	if (payload_length < 8 || (ip_header->ip6_ctlun.ip6_un2_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+	if (payload_length < 8 || (ip_header->ip6_vfc >> 4) != 6) {
 		return 0;
 	}
 	
 	length_left = payload_length;
-	next_header_proto = ip_header->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+	next_header_proto = ip_header->ip6_nxt;
 	next_header = icmp_payload + IPv6_HEADER_SIZE;
 	length_left -= IPv6_HEADER_SIZE;
 	while (next_header_proto != IPPROTO_UDP && length_left >= 2) {

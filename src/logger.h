@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 #define LOG_LEVEL_NOLOG	0xff
 #define LOG_LEVEL_ERROR	0xc0
