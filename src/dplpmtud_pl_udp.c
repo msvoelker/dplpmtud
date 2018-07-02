@@ -41,8 +41,8 @@ int send_probe(int socket, uint32_t probe_size) {
 	struct udp_heartbeat *heartbeat_request;
 	size_t udp_payload_size;
 	
-	if (probe_size < (IP_HEADER_SIZE + UDP_HEADER_SIZE)) {
-		udp_payload_size = 0;
+	if (probe_size < (IP_HEADER_SIZE + UDP_HEADER_SIZE + sizeof(struct udp_heartbeat))) {
+		udp_payload_size = sizeof(struct udp_heartbeat);
 	} else {
 		udp_payload_size = probe_size - IP_HEADER_SIZE - UDP_HEADER_SIZE;
 	}
