@@ -2,6 +2,10 @@
 #ifndef _DPLPMTUD_PL_H_
 #define _DPLPMTUD_PL_H_
 
+#ifdef __linux__ 
+#include <bits/types.h>
+#endif 
+
 int send_probe(int, uint32_t);
 int message_handler(int, void *, size_t, struct sockaddr *, socklen_t);
 

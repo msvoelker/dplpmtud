@@ -231,6 +231,9 @@ state_t run_search_state() {
 				} else if (ptb_mtu < probe_size) {
 					probe_size = ptb_mtu;
 					max_pmtu = ptb_mtu;
+					if (probed_size_success == max_pmtu) {
+						return DONE;
+					}
 				} else {
 					LOG_ERROR_("%s - got PTB interrupt in SEARCH state with ptb_mtu >= probe_size. %u %u", THREAD_NAME, ptb_mtu, probe_size);
 					return DISABLED;
