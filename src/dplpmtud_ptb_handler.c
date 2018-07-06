@@ -27,12 +27,16 @@ int dplpmtud_ptb_handler_init(int dplpmtud_socket) {
 		icmp_socket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); 
 	} else {
 		icmp_socket = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6); 
-		ICMP6_FILTER_SETBLOCKALL(&icmp6_filt);
-		ICMP6_FILTER_SETPASS(ICMP6_PACKET_TOO_BIG, &icmp6_filt);
-		setsockopt(icmp_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &icmp6_filt, sizeof(icmp6_filt));
 	}
 	if (icmp_socket < 0) {
 		LOG_PERROR("could not create icmp socket.");
+		return icmp_socket;
+	}
+	
+	if (dplpmtud_ip_version == IPv6) {
+		ICMP6_FILTER_SETBLOCKALL(&icmp6_filt);
+		ICMP6_FILTER_SETPASS(ICMP6_PACKET_TOO_BIG, &icmp6_filt);
+		setsockopt(icmp_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &icmp6_filt, sizeof(icmp6_filt));
 	}
 	
 	// get src address, bind 

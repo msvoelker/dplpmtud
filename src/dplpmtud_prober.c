@@ -123,13 +123,15 @@ uint32_t get_probe_sequence_number() {
 
 static void send_probe() {
 	LOG_DEBUG("send_probe entered");
-	probe_sequence_number++;
-	probe_count++;
 	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
 	if (dplpmtud_send_probe(dplpmtud_socket, probe_size) < 0) {
 		LOG_PERROR("dplpmtud_send_probe");
-	} 
-	start_timer(probe_timer, PROBE_TIMEOUT*1000);
+		(*state_probe_failed_table[state])();
+	} else {
+		probe_sequence_number++;
+		probe_count++;
+		start_timer(probe_timer, PROBE_TIMEOUT*1000);
+	}
 	LOG_DEBUG("leave send_probe");
 }
 
@@ -361,7 +363,7 @@ static void on_validation_timer_expired(void *arg) {
 	LOG_DEBUG("leave on_validation_timer_expired");
 }
 
-void dplpmtud_start_prober(int socket) {
+int dplpmtud_start_prober(int socket) {
 	LOG_DEBUG("dplpmtud_start_prober entered");
 	
 	dplpmtud_socket = socket;
@@ -374,10 +376,12 @@ void dplpmtud_start_prober(int socket) {
 	if (dplpmtud_ip_version == IPv4) {
 		if (set_ip_dont_fragment_option(dplpmtud_socket) != 0) {
 			LOG_PERROR("setsockopt IP_DONTFRAG");
+			return -1;
 		}
 	} else {
 		if (setsockopt(dplpmtud_socket, IPPROTO_IPV6, IPV6_DONTFRAG, &val, sizeof(val)) != 0) {
 			LOG_PERROR("setsockopt IPV6_DONTFRAG");
+			return -1;
 		}
 	}
 	
@@ -385,4 +389,5 @@ void dplpmtud_start_prober(int socket) {
 	probe_sequence_number = 0;
 	start_run();
 	LOG_DEBUG("leave dplpmtud_start_prober");
+	return 0;
 }

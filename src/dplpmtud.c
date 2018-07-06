@@ -13,7 +13,6 @@
 #include "dplpmtud_pl.h"
 
 // TODO: increase probe_size better
-// TODO: Handle errors better 
 // TODO: implement DISABLED state
 
 #define BUFFER_SIZE (1<<16)
@@ -34,7 +33,11 @@ void dplpmtud_socket_readable(void *arg) {
 	from_addr_len = (socklen_t) sizeof(from_addr);
 	memset((void *) &from_addr, 0, sizeof(from_addr));
 	recv_len = recvfrom(dplpmtud_socket, buf, BUFFER_SIZE, 0, (struct sockaddr *) &from_addr, &from_addr_len);
-	dplpmtud_message_handler(dplpmtud_socket, buf, recv_len, (struct sockaddr *)&from_addr, from_addr_len);
+	if (recv_len < 0) {
+		LOG_PERROR("error receiving on dplpmtud socket.");
+	} else {
+		dplpmtud_message_handler(dplpmtud_socket, buf, recv_len, (struct sockaddr *)&from_addr, from_addr_len);
+	}
 	
 	LOG_DEBUG("leave dplpmtud_socket_readable");
 }
@@ -48,12 +51,17 @@ static void *controller(void *arg) {
 	register_fd_callback(dplpmtud_socket, &dplpmtud_socket_readable, NULL);
 	if (!dplpmtud_passive_mode) {
 		
-		if (dplpmtud_handle_ptb) {
+		if (dplpmtud_start_prober(dplpmtud_socket) < 0) {
+			dplpmtud_passive_mode = 1;
+			LOG_ERROR("Could not start prober");
+		} else if (dplpmtud_handle_ptb) {
 			icmp_socket = dplpmtud_ptb_handler_init(dplpmtud_socket);
-			register_fd_callback(icmp_socket, &dplpmtud_icmp_socket_readable, NULL);
+			if (icmp_socket < 0) {
+				LOG_ERROR("Could not start ptb listener");
+			} else {
+				register_fd_callback(icmp_socket, &dplpmtud_icmp_socket_readable, NULL);
+			}
 		}
-		
-		dplpmtud_start_prober(dplpmtud_socket);
 	}
 	
 	// release super user privilege
