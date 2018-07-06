@@ -207,10 +207,11 @@ static void search_probe_acked() {
 	probed_size = probe_size;
 	if (probed_size == max_pmtu) {
 		done_run();
+	} else {
+		increase_probe_size();
+		probe_count = 0;
+		send_probe();
 	}
-	increase_probe_size();
-	probe_count = 0;
-	send_probe();
 	LOG_DEBUG("leave search_probe_acked");
 }
 

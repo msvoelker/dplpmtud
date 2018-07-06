@@ -13,6 +13,8 @@
 #include "dplpmtud_pl.h"
 
 // TODO: increase probe_size better
+// TODO: Handle errors better 
+// TODO: implement DISABLED state
 
 #define BUFFER_SIZE (1<<16)
 
