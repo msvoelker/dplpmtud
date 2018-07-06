@@ -24,6 +24,7 @@
 #define MIN_PMTU_IPv6 1280
 #define MIN_PMTU_IPv4 68
 #define MIN_PMTU ((dplpmtud_ip_version == IPv4) ? MIN_PMTU_IPv4 : MIN_PMTU_IPv6)
+#define MAX_PMTU 16384
 
 #define PROBE_TIMEOUT 20
 #define VALIDATION_TIMEOUT 100
@@ -61,7 +62,7 @@ static void error_probe_failed();
 static void done_run();
 static void done_probe_acked();
 static void done_probe_failed();
-static void done_ptb_received(uint32_t ptb_mtu);
+static void done_ptb_received(uint32_t);
 
 state_run_func_t* const state_run_table[] = {
 	start_run, 
@@ -99,7 +100,7 @@ state_ptb_received_func_t* const state_ptb_received_table[] = {
 static int dplpmtud_socket;
 static uint32_t probe_size;
 static uint32_t probed_size;
-static uint32_t max_pmtu;
+static uint32_t current_max_pmtu;
 static uint32_t probe_sequence_number;
 static uint32_t ptb_mtu_limit;
 static uint32_t probe_count;
@@ -111,8 +112,8 @@ static struct timer *validation_timer;
 
 static void increase_probe_size() {
 	probe_size += 50;
-	if (probe_size > max_pmtu) {
-		probe_size = max_pmtu;
+	if (probe_size > current_max_pmtu) {
+		probe_size = current_max_pmtu;
 	}
 }
 
@@ -132,11 +133,31 @@ static void send_probe() {
 	LOG_DEBUG("leave send_probe");
 }
 
+void update_max_pmtu() {
+	int mtu;
+	
+	current_max_pmtu = 1500;
+	mtu = get_local_if_mtu(dplpmtud_socket);
+	if (mtu <= 0) {
+		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", current_max_pmtu);
+	} else {
+		if (MAX_PMTU < mtu) {
+			current_max_pmtu = MAX_PMTU;
+			LOG_INFO_("current_max_pmtu = MAX_PMTU = %d", current_max_pmtu);
+		} else {
+			current_max_pmtu = mtu;
+			LOG_INFO_("current_max_pmtu = mtu of local interface = %d", current_max_pmtu);
+		}
+	}
+}
+
+
 static void disabled_run() {
 	LOG_DEBUG("disabled_run entered");
 	state = DISABLED;
 	LOG_DEBUG("leave disabled_run");
 }
+
 
 static void start_run() {
 	LOG_DEBUG("start_run entered");
@@ -195,6 +216,7 @@ static void base_ptb_received(uint32_t ptb_mtu) {
 static void search_run() {
 	LOG_DEBUG("search_run entered");
 	state = SEARCH;
+	update_max_pmtu();
 	increase_probe_size();
 	ptb_mtu_limit = probe_size;
 	probe_count = 0;
@@ -205,7 +227,7 @@ static void search_run() {
 static void search_probe_acked() {
 	LOG_DEBUG("search_probe_acked entered");
 	probed_size = probe_size;
-	if (probed_size == max_pmtu) {
+	if (probed_size == current_max_pmtu) {
 		done_run();
 	} else {
 		increase_probe_size();
@@ -227,8 +249,8 @@ static void search_ptb_received(uint32_t ptb_mtu) {
 		base_run();
 	} else if (ptb_mtu < probe_size) {
 		probe_size = ptb_mtu;
-		max_pmtu = ptb_mtu;
-		if (probed_size == max_pmtu) {
+		current_max_pmtu = ptb_mtu;
+		if (probed_size == current_max_pmtu) {
 			done_run();
 		} else {
 			probe_count = 0;
@@ -341,21 +363,13 @@ static void on_validation_timer_expired(void *arg) {
 
 void dplpmtud_start_prober(int socket) {
 	LOG_DEBUG("dplpmtud_start_prober entered");
-	int mtu;
 	
 	dplpmtud_socket = socket;
 	
 	probe_timer = create_timer(&on_probe_timer_expired, NULL, "probe timer");
 	validation_timer = create_timer(&on_validation_timer_expired, NULL, "validation timer");
 	
-	max_pmtu = 1500;
-	mtu = get_local_if_mtu(dplpmtud_socket);
-	if (mtu <= 0) {
-		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", max_pmtu);
-	} else {
-		max_pmtu = mtu;
-		LOG_INFO_("max_pmtu = mtu of local interface = %d", max_pmtu);
-	}
+	update_max_pmtu();
 	int val = 1;
 	if (dplpmtud_ip_version == IPv4) {
 		if (set_ip_dont_fragment_option(dplpmtud_socket) != 0) {
