@@ -1,4 +1,3 @@
-
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,65 +7,68 @@
 #include "logger.h"
 #include "dplpmtud_main.h"
 #include "dplpmtud_prober.h"
-#include "dplpmtud_ptb_listener.h"
-#include "dplpmtud_listener.h"
+#include "dplpmtud_ptb_handler.h"
 
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/icmp6.h>
+#include "cblib.h"
+#include "dplpmtud_pl.h"
 
 // TODO: increase probe_size better
 
-pthread_t main_thread_id = 0;
-pthread_t listener_thread_id;
-pthread_t prober_thread_id;
-pthread_t ptb_listener_thread_id;
+#define BUFFER_SIZE (1<<16)
+
 int dplpmtud_socket = 0;
 
+static pthread_t dplpmtud_thread_id = 0;
 static int dplpmtud_passive_mode;
 static int dplpmtud_handle_ptb;
 
+void dplpmtud_socket_readable(void *arg) {
+	LOG_DEBUG("dplpmtud_socket_readable entered");
+	ssize_t recv_len;
+	char buf[BUFFER_SIZE];
+	struct sockaddr_storage from_addr;
+	socklen_t from_addr_len;
+	
+	from_addr_len = (socklen_t) sizeof(from_addr);
+	memset((void *) &from_addr, 0, sizeof(from_addr));
+	recv_len = recvfrom(dplpmtud_socket, buf, BUFFER_SIZE, 0, (struct sockaddr *) &from_addr, &from_addr_len);
+	dplpmtud_message_handler(dplpmtud_socket, buf, recv_len, (struct sockaddr *)&from_addr, from_addr_len);
+	
+	LOG_DEBUG("leave dplpmtud_socket_readable");
+}
+
 static void *controller(void *arg) {
-	LOG_DEBUG_("%s - controller entered", THREAD_NAME);
-	struct icmp6_filter icmp6_filt;
+	LOG_DEBUG("controller entered");
 	int icmp_socket;
 	
+	init_cblib();
+	
+	register_fd_callback(dplpmtud_socket, &dplpmtud_socket_readable, NULL);
 	if (!dplpmtud_passive_mode) {
-		dplpmtud_prober_init();
+		
 		if (dplpmtud_handle_ptb) {
-			icmp_socket = -1;
-			if (dplpmtud_ip_version == IPv4) {
-				icmp_socket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); 
-			} else {
-				icmp_socket = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6); 
-				ICMP6_FILTER_SETBLOCKALL(&icmp6_filt);
-				ICMP6_FILTER_SETPASS(ICMP6_PACKET_TOO_BIG, &icmp6_filt);
-				setsockopt(icmp_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &icmp6_filt, sizeof(icmp6_filt));
-			}
-			if (icmp_socket < 0) {
-				LOG_PERROR("could not create icmp socket.");
-			}
-			// release super user privilege
-			if (setuid(getuid()) != 0) {
-				LOG_DEBUG_("%s - could not release super user privilege.", THREAD_NAME);
-			}
-			dplpmtud_ptb_listener_init(icmp_socket);
-			pthread_create(&ptb_listener_thread_id, NULL, dplpmtud_ptb_listener, NULL);
+			icmp_socket = dplpmtud_ptb_handler_init(dplpmtud_socket);
+			register_fd_callback(icmp_socket, &dplpmtud_icmp_socket_readable, NULL);
 		}
-		pthread_create(&prober_thread_id, NULL, dplpmtud_prober, NULL);
+		
+		dplpmtud_start_prober(dplpmtud_socket);
 	}
 	
-	listener_thread_id = main_thread_id;
-	LOG_DEBUG_("%s - leave controller", THREAD_NAME);
-	return dplpmtud_listener(NULL);
+	// release super user privilege
+	if (setuid(getuid()) != 0) {
+		LOG_DEBUG("could not release super user privilege.");
+	}
+	handle_events();
+	
+	return 0;
 }
 
 pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int handle_ptb) {
-	LOG_DEBUG_("%s - dplpmtud_start entered", THREAD_NAME);
-	if (main_thread_id != 0) {
+	LOG_DEBUG("dplpmtud_start entered");
+	if (dplpmtud_thread_id != 0) {
 		// dplpmtud thread already started
-		LOG_INFO_("%s - dplpmtud thread already started", THREAD_NAME);
-		LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
+		LOG_INFO("dplpmtud thread already started");
+		LOG_DEBUG("leave dplpmtud_start");
 		return 0;
 	}
 	if (address_family == AF_INET) {
@@ -74,8 +76,8 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 	} else if (address_family == AF_INET6) {
 		dplpmtud_ip_version = IPv6;
 	} else {
-		LOG_ERROR_("%s - unknown address family", THREAD_NAME);
-		LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
+		LOG_ERROR("unknown address family");
+		LOG_DEBUG("leave dplpmtud_start");
 		return 0;
 	}
 	dplpmtud_socket = socket;
@@ -87,15 +89,15 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 		dplpmtud_handle_ptb = handle_ptb;
 	}
 	
-	pthread_create(&main_thread_id, NULL, controller, NULL);
-	LOG_DEBUG_("%s - leave dplpmtud_start", THREAD_NAME);
-	return main_thread_id;
+	pthread_create(&dplpmtud_thread_id, NULL, controller, NULL);
+	LOG_DEBUG("leave dplpmtud_start");
+	return dplpmtud_thread_id;
 }
 
 void dplpmtud_wait() {
-	LOG_DEBUG_("%s - dplpmtud_wait entered", THREAD_NAME);
-	if (main_thread_id != 0) {
-		pthread_join(main_thread_id, NULL);
+	LOG_DEBUG("dplpmtud_wait entered");
+	if (dplpmtud_thread_id != 0) {
+		pthread_join(dplpmtud_thread_id, NULL);
 	}
-	LOG_DEBUG_("%s - leave dplpmtud_wait", THREAD_NAME);
+	LOG_DEBUG("leave dplpmtud_wait");
 }

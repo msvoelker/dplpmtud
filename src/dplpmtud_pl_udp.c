@@ -34,8 +34,8 @@ struct udp_heartbeat {
 static uint32_t token = 4711;
 
 // message specific 
-int send_probe(int socket, uint32_t probe_size) {
-	LOG_DEBUG_("%s - send_probe entered", THREAD_NAME);
+int dplpmtud_send_probe(int socket, uint32_t probe_size) {
+	LOG_DEBUG("send_probe entered");
 	
 	char *udp_payload;
 	struct udp_heartbeat *heartbeat_request;
@@ -55,7 +55,7 @@ int send_probe(int socket, uint32_t probe_size) {
 	heartbeat_request->seq_no = get_probe_sequence_number();
 	heartbeat_request->token = token;
 	
-	LOG_DEBUG_("%s - leave send_probe", THREAD_NAME);
+	LOG_DEBUG("leave send_probe");
 	return send(socket, (const void *) udp_payload, udp_payload_size, 0);
 }
 
@@ -64,21 +64,21 @@ static int handle_heartbeat_response(struct udp_heartbeat *heartbeat_response) {
 	uint32_t seq_no;
 	
 	seq_no = get_probe_sequence_number();
-	LOG_DEBUG_("%s - handle_heartbeat_response entered", THREAD_NAME);
-	LOG_DEBUG_("%s - heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", THREAD_NAME, heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
+	LOG_DEBUG("handle_heartbeat_response entered");
+	LOG_DEBUG_("heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
 	if (heartbeat_response->token == token && heartbeat_response->seq_no == seq_no) {
-		signal_probe_return();
-		LOG_DEBUG_("%s - leave handle_heartbeat_response", THREAD_NAME);
+		dplpmtud_probe_acked();
+		LOG_DEBUG("leave handle_heartbeat_response");
 		return 1;
 	}
-	LOG_DEBUG_("%s - leave handle_heartbeat_response", THREAD_NAME);
+	LOG_DEBUG("leave handle_heartbeat_response");
 	return 0;
 }
 
 
 // message specific 
 static int send_heartbeat_response(struct udp_heartbeat *heartbeat_request, int socket, struct sockaddr *to_addr, socklen_t to_addr_len) {
-	LOG_DEBUG_("%s - send_heartbeat_response entered", THREAD_NAME);
+	LOG_DEBUG("send_heartbeat_response entered");
 	struct udp_heartbeat heartbeat_respone;
 	
 	memset(&heartbeat_respone, 0, sizeof(struct udp_heartbeat));
@@ -87,40 +87,40 @@ static int send_heartbeat_response(struct udp_heartbeat *heartbeat_request, int 
 	heartbeat_respone.seq_no = heartbeat_request->seq_no;
 	heartbeat_respone.token = heartbeat_request->token;
 	
-	LOG_DEBUG_("%s - leave send_heartbeat_response", THREAD_NAME);
+	LOG_DEBUG("leave send_heartbeat_response");
 	return sendto(socket, (const void *)&heartbeat_respone, sizeof(struct udp_heartbeat), 0, to_addr, to_addr_len);
 }
 
 // message specific 
-int message_handler(int socket, void *message, size_t message_length, struct sockaddr *from_addr, socklen_t from_addr_len) {
-	LOG_DEBUG_("%s - message_handler entered", THREAD_NAME);
+int dplpmtud_message_handler(int socket, void *message, size_t message_length, struct sockaddr *from_addr, socklen_t from_addr_len) {
+	LOG_DEBUG("message_handler entered");
 	struct udp_heartbeat *heartbeat;
 	
 	if (message_length < 12) {
-		LOG_ERROR_("%s - message is too small for a heartbeat", THREAD_NAME);
-		LOG_DEBUG_("%s - leave message_handler", THREAD_NAME);
+		LOG_ERROR("message is too small for a heartbeat");
+		LOG_DEBUG("leave message_handler");
 		return -1;
 	}
 	heartbeat = (struct udp_heartbeat *)message;
 	
 	if (ntohs(heartbeat->length) != 12) {
-		LOG_ERROR_("%s - heartbeat length is not 12 byte. %hu", THREAD_NAME, heartbeat->length);
-		LOG_DEBUG_("%s - leave message_handler", THREAD_NAME);
+		LOG_ERROR_("heartbeat length is not 12 byte. %hu", heartbeat->length);
+		LOG_DEBUG("leave message_handler");
 		return -1;
 	}
 	
-	LOG_DEBUG_("%s - heartbeat type: %u, length: %u received", THREAD_NAME, heartbeat->type, ntohs(heartbeat->length));
+	LOG_DEBUG_("heartbeat type: %u, length: %u received", heartbeat->type, ntohs(heartbeat->length));
 	if (heartbeat->type == 4) {
 		// heartbeat request
-		LOG_DEBUG_("%s - leave message_handler", THREAD_NAME);
+		LOG_DEBUG("leave message_handler");
 		return send_heartbeat_response(heartbeat, socket, from_addr, from_addr_len);
 	} else if (heartbeat->type == 5) {
 		// valid heartbeat response
-		LOG_DEBUG_("%s - leave message_handler", THREAD_NAME);
+		LOG_DEBUG("leave message_handler");
 		return handle_heartbeat_response(heartbeat);
 	}
 	
-	LOG_DEBUG_("%s - leave message_handler", THREAD_NAME);
+	LOG_DEBUG("leave message_handler");
 	return -1;
 	
 }

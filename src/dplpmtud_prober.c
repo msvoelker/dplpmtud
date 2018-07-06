@@ -12,10 +12,10 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include "logger.h"
-#include "dplpmtud_prober_states.h"
 #include "dplpmtud_pl.h"
 #include "dplpmtud_util.h"
 #include "dplpmtud_main.h"
+#include "cblib.h"
 
 #define BASE_PMTU_IPv6 1280
 #define BASE_PMTU_IPv4 1200
@@ -26,34 +26,88 @@
 #define MIN_PMTU ((dplpmtud_ip_version == IPv4) ? MIN_PMTU_IPv4 : MIN_PMTU_IPv6)
 
 #define PROBE_TIMEOUT 20
-#define REACHABILITY_TIMEOUT 100
-#define RAISE_TIMEOUT 600
+#define VALIDATION_TIMEOUT 100
+#define MAX_VALIDATION 5
 
+typedef enum { 
+	START=0,
+	DISABLED,
+	BASE,
+	SEARCH,
+	ERROR,
+	DONE 
+} state_t;
+
+typedef void state_run_func_t();
+typedef void state_probe_acked_func_t();
+typedef void state_probe_failed_func_t();
+typedef void state_ptb_received_func_t(uint32_t);
+
+static void start_run();
+static void start_probe_acked();
+static void start_probe_failed();
+static void disabled_run();
+static void base_run();
+static void base_probe_acked();
+static void base_probe_failed();
+static void base_ptb_received(uint32_t);
+static void search_run();
+static void search_probe_acked();
+static void search_probe_failed();
+static void search_ptb_received(uint32_t);
+static void error_run();
+static void error_probe_acked();
+static void error_probe_failed();
+static void done_run();
+static void done_probe_acked();
+static void done_probe_failed();
+static void done_ptb_received(uint32_t ptb_mtu);
+
+state_run_func_t* const state_run_table[] = {
+	start_run, 
+	disabled_run,
+	base_run, 
+	search_run, 
+	error_run,
+	done_run
+};
+state_probe_acked_func_t* const state_probe_acked_table[] = {
+	start_probe_acked, 
+	NULL,
+	base_probe_acked, 
+	search_probe_acked, 
+	error_probe_acked,
+	done_probe_acked
+};
+state_probe_failed_func_t* const state_probe_failed_table[] = {
+	start_probe_failed, 
+	NULL,
+	base_probe_failed, 
+	search_probe_failed, 
+	error_probe_failed,
+	done_probe_failed
+};
+state_ptb_received_func_t* const state_ptb_received_table[] = {
+	NULL, 
+	NULL,
+	base_ptb_received, 
+	search_ptb_received, 
+	NULL,
+	done_ptb_received
+};
+
+static int dplpmtud_socket;
 static uint32_t probe_size;
-static uint32_t probed_size_success;
-static uint32_t max_pmtu = 1500;
+static uint32_t probed_size;
+static uint32_t max_pmtu;
+static uint32_t probe_sequence_number;
+static uint32_t ptb_mtu_limit;
+static uint32_t probe_count;
+static uint32_t validation_count;
+static state_t state;
+static struct timer *probe_timer;
+static struct timer *validation_timer;
 
-static pthread_mutex_t probe_return_mutex;
-static pthread_cond_t probe_return_cond;
-static uint32_t volatile probe_return;
-
-static pthread_mutex_t probe_sequence_number_mutex;
-static uint32_t volatile probe_sequence_number;
-
-static uint32_t ptb_mtu;
-
-static pthread_mutex_t ptb_mtu_limit_mutex;
-static uint32_t volatile ptb_mtu_limit;
-
-void dplpmtud_prober_init() {
-	probe_return_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-	probe_return_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-	probe_return = 0;
-	probe_sequence_number_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-	probe_sequence_number = 0;
-	ptb_mtu_limit_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-	ptb_mtu_limit = 1;
-}
 
 static void increase_probe_size() {
 	probe_size += 50;
@@ -62,238 +116,238 @@ static void increase_probe_size() {
 	}
 }
 
-static void increment_probe_sequence_number() {
-	pthread_mutex_lock(&probe_sequence_number_mutex);
-	probe_sequence_number++;
-	pthread_mutex_unlock(&probe_sequence_number_mutex);
-}
-
-static int do_probe() {
-	LOG_DEBUG_("%s - do_probe entered", THREAD_NAME);
-	uint32_t probe_count;
-	struct timespec stop_time;
-	struct timeval now;
-	
-	probe_count = 0;
-	
-	pthread_mutex_lock(&probe_return_mutex);
-	LOG_DEBUG_("%s - mutex locked", THREAD_NAME);
-	while (probe_count < MAX_PROBES) {
-		increment_probe_sequence_number();
-		probe_return = 0;
-		LOG_INFO_("%s - probe %u bytes with seq_no= %u", THREAD_NAME, probe_size, probe_sequence_number);
-		probe_count++;
-		if (send_probe(dplpmtud_socket, probe_size) < 0) {
-			LOG_PERROR_("%s - send_probe", THREAD_NAME);
-		} else {
-			LOG_DEBUG_("%s - cond wait", THREAD_NAME);
-			gettimeofday(&now, NULL);
-			stop_time.tv_sec = now.tv_sec+PROBE_TIMEOUT;
-			stop_time.tv_nsec = now.tv_usec * 1000;
-			pthread_cond_timedwait(&probe_return_cond, &probe_return_mutex, &stop_time); 
-		}
-		LOG_DEBUG_("%s - probe_return == %d", THREAD_NAME, probe_return);
-		if (probe_return == 1) { /* heartbeat response received */
-			LOG_INFO_("%s - probe with %u bytes succeeded", THREAD_NAME, probe_size);
-			probed_size_success = probe_size;
-			
-			pthread_mutex_unlock(&probe_return_mutex);
-			LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
-			return 1;
-		} else if (probe_return > 1) { /* valid PTB received */
-			ptb_mtu = probe_return;
-			pthread_mutex_unlock(&probe_return_mutex);
-			LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
-			return 2;
-		} 
-	}
-	pthread_mutex_unlock(&probe_return_mutex);
-	LOG_INFO_("%s - probe with %u bytes failed", THREAD_NAME, probe_size);
-	LOG_DEBUG_("%s - leave do_probe", THREAD_NAME);
-	return 0;
-}
-
-static int is_raise_timer_expired(time_t raise_timer_start) {
-	if ((time(NULL) - raise_timer_start) >= RAISE_TIMEOUT) {
-		LOG_DEBUG_("%s - RAISE_TIMER expired", THREAD_NAME);
-		return 1;
-	}
-	return 0;
-}
-
-static void set_ptb_mtu_limit(uint32_t mtu_limit) {
-	pthread_mutex_lock(&ptb_mtu_limit_mutex);
-	ptb_mtu_limit = mtu_limit;
-	pthread_mutex_unlock(&ptb_mtu_limit_mutex);
-}
-
-static uint32_t get_ptb_mtu_limit() {
-	uint32_t mtu_limit;
-	pthread_mutex_lock(&ptb_mtu_limit_mutex);
-	mtu_limit = ptb_mtu_limit;
-	pthread_mutex_unlock(&ptb_mtu_limit_mutex);
-	return mtu_limit;
-}
-
-int signal_probe_return() {
-	pthread_mutex_lock(&probe_return_mutex);
-	probe_return = 1;
-	LOG_DEBUG_("%s - probe_return = 1", THREAD_NAME);
-	pthread_cond_signal(&probe_return_cond);
-	pthread_mutex_unlock(&probe_return_mutex);
-	return 1;
-}
-
-int signal_probe_return_with_mtu(uint32_t mtu) {
-	LOG_DEBUG_("%s - enter signal_probe_return_with_mtu", THREAD_NAME);
-	uint32_t mtu_limit;
-	mtu_limit = get_ptb_mtu_limit();
-	if ( !(mtu_limit == 0 || (1 < mtu && mtu < mtu_limit)) ) {
-		LOG_DEBUG_("%s - do not signal probe return. %u, %u", THREAD_NAME, mtu, mtu_limit);
-		return 0;
-	}
-	LOG_DEBUG_("%s - signal probe return with mtu %u", THREAD_NAME, mtu);
-	pthread_mutex_lock(&probe_return_mutex);
-	probe_return = mtu;
-	LOG_DEBUG_("%s - probe_return = %u", THREAD_NAME, mtu);
-	pthread_cond_signal(&probe_return_cond);
-	pthread_mutex_unlock(&probe_return_mutex);
-	return 1;
-}
-
 uint32_t get_probe_sequence_number() {
-	uint32_t seq_no;
-	pthread_mutex_lock(&probe_sequence_number_mutex);
-	seq_no = probe_sequence_number;
-	pthread_mutex_unlock(&probe_sequence_number_mutex);
-	return seq_no;
+	return probe_sequence_number;
 }
 
-state_t run_start_state() {
-	LOG_DEBUG_("%s - run_start_state entered", THREAD_NAME);
-	int probe_value;
-	
+static void send_probe() {
+	LOG_DEBUG("send_probe entered");
+	probe_sequence_number++;
+	probe_count++;
+	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
+	if (dplpmtud_send_probe(dplpmtud_socket, probe_size) < 0) {
+		LOG_PERROR("dplpmtud_send_probe");
+	} 
+	start_timer(probe_timer, PROBE_TIMEOUT*1000);
+	LOG_DEBUG("leave send_probe");
+}
+
+static void disabled_run() {
+	LOG_DEBUG("disabled_run entered");
+	state = DISABLED;
+	LOG_DEBUG("leave disabled_run");
+}
+
+static void start_run() {
+	LOG_DEBUG("start_run entered");
+	state = START;
 	probe_size = 0;
-	set_ptb_mtu_limit(0);
-	probe_value = do_probe();
-	if (probe_value == 1) { /* heartbeat response received */
-		LOG_INFO_("%s - connectivity confirmed", THREAD_NAME);
-		LOG_DEBUG_("%s - leave run_start_state", THREAD_NAME);
-		return BASE;
-	}
-	LOG_INFO_("%s - could not confirm connectivity -> disable PMTU", THREAD_NAME);
-	LOG_DEBUG_("%s - leave run_start_state", THREAD_NAME);
-	return DISABLED;
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave start_run");
 }
 
-state_t run_base_state() {
-	LOG_DEBUG_("%s - run_base_state entered", THREAD_NAME);
-	int probe_value;
-	
+static void start_probe_acked() {
+	LOG_DEBUG("start_probe_acked entered");
+	base_run();
+	LOG_DEBUG("leave start_probe_acked");
+}
+
+static void start_probe_failed() {
+	LOG_DEBUG("start_probe_failed entered");
+	disabled_run();
+	LOG_DEBUG("leave start_probe_failed");
+}
+
+
+static void base_run() {
+	LOG_DEBUG("base_run entered");
+	state = BASE;
 	probe_size = BASE_PMTU;
-	set_ptb_mtu_limit(0);
-	probe_value = do_probe();
-	switch (probe_value) {
-		case 0: /* no response */
-			return ERROR;
-		case 1: /* heartbeat response received */
-			return SEARCH;
-		case 2: /* PTB received */
-			if (ptb_mtu < BASE_PMTU) {
-				return ERROR;
-			} else {
-				return DONE;
-			}
-	}
-	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
-	return DISABLED;
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave base_run");
 }
 
-state_t run_search_state() {
-	int probe_value;
-	
-	probe_value = 1;
-	while (probe_value == 1 || probe_value == 2) {
-		set_ptb_mtu_limit(probe_size);
-		probe_value = do_probe();
-		switch (probe_value) {
-			case 0: /* no response */
-				return DONE;
-			case 1: /* heartbeat response received */
-				if (probed_size_success == max_pmtu) {
-					return DONE;
-				}
-				increase_probe_size();
-				break;
-			case 2: /* PTB with MTU < probe_size */
-				if (ptb_mtu < probed_size_success) {
-					return BASE;
-				} else if (ptb_mtu < probe_size) {
-					probe_size = ptb_mtu;
-					max_pmtu = ptb_mtu;
-					if (probed_size_success == max_pmtu) {
-						return DONE;
-					}
-				} else {
-					LOG_ERROR_("%s - got PTB interrupt in SEARCH state with ptb_mtu >= probe_size. %u %u", THREAD_NAME, ptb_mtu, probe_size);
-					return DISABLED;
-				}
-		}
-	}
-	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
-	return DISABLED;
+static void base_probe_acked() {
+	LOG_DEBUG("base_probe_acked entered");
+	search_run();
+	LOG_DEBUG("leave base_probe_acked");
 }
 
-state_t run_done_state() {
-	LOG_DEBUG_("%s - run_done_state entered", THREAD_NAME);
-	int probe_value;
-	time_t raise_timer_start;
-	
-	set_ptb_mtu_limit(1);
-	probe_size = probed_size_success;
-	raise_timer_start = time(NULL);
-	probe_value = 1;
-	while (probe_value == 1) {
-		LOG_DEBUG_("%s - sleep for REACHABILITY_TIMEOUT", THREAD_NAME);
-		sleep(REACHABILITY_TIMEOUT);
-		if (is_raise_timer_expired(raise_timer_start)) {
-			return SEARCH;
-		}
-		probe_value = do_probe();
-		if (probe_value == 0) { /* no response */
-			LOG_INFO_("%s - probe with confirmed size failed -> go back to BASE", THREAD_NAME);
-			LOG_DEBUG_("%s - leave run_done_state", THREAD_NAME);
-			return BASE;
-		}
-		if (is_raise_timer_expired(raise_timer_start)) {
-			return SEARCH;
-		}
-	}
-	
-	LOG_ERROR_("%s - do_probe with unexpected return value %d", THREAD_NAME, probe_value);
-	return DISABLED;
+static void base_probe_failed() {
+	LOG_DEBUG("base_probe_failed entered");
+	error_run();
+	LOG_DEBUG("leave base_probe_failed");
 }
 
-state_t run_error_state() {
-	LOG_DEBUG_("%s - run_error_state entered", THREAD_NAME);
-	int probe_success;
-	
+static void base_ptb_received(uint32_t ptb_mtu) {
+	LOG_DEBUG("base_ptb_received entered");
+	if (ptb_mtu < BASE_PMTU) {
+		error_run();
+	} else {
+		done_run();
+	}
+	LOG_DEBUG("leave base_ptb_received");
+}
+
+
+static void search_run() {
+	LOG_DEBUG("search_run entered");
+	state = SEARCH;
+	increase_probe_size();
+	ptb_mtu_limit = probe_size;
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave search_run");
+}
+
+static void search_probe_acked() {
+	LOG_DEBUG("search_probe_acked entered");
+	probed_size = probe_size;
+	if (probed_size == max_pmtu) {
+		done_run();
+	}
+	increase_probe_size();
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave search_probe_acked");
+}
+
+static void search_probe_failed() {
+	LOG_DEBUG("search_probe_failed entered");
+	done_run();
+	LOG_DEBUG("leave search_probe_failed");
+}
+
+static void search_ptb_received(uint32_t ptb_mtu) {
+	LOG_DEBUG("search_ptb_received entered");
+	if (ptb_mtu < probed_size) {
+		base_run();
+	} else if (ptb_mtu < probe_size) {
+		probe_size = ptb_mtu;
+		max_pmtu = ptb_mtu;
+		if (probed_size == max_pmtu) {
+			done_run();
+		} else {
+			probe_count = 0;
+			send_probe();
+		}
+	}
+	LOG_DEBUG("leave search_ptb_received");
+}
+
+
+static void error_run() {
+	LOG_DEBUG("error_run entered");
+	state = ERROR;
 	probe_size = MIN_PMTU;
-	set_ptb_mtu_limit(1);
-	probe_success = 0;
-	while (!probe_success) {
-		probe_success = do_probe();
-	}
-	
-	LOG_DEBUG_("%s - leave run_error_state", THREAD_NAME);
-	return SEARCH;
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave error_run");
 }
 
-void *dplpmtud_prober(void *arg) {
-	LOG_DEBUG_("%s - prober entered", THREAD_NAME);
-	state_t state;
+static void error_probe_acked() {
+	LOG_DEBUG("error_probe_acked entered");
+	search_run();
+	LOG_DEBUG("leave error_probe_acked");
+}
+
+static void error_probe_failed() {
+	LOG_DEBUG("error_probe_failed entered");
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave error_probe_failed");
+}
+
+
+static void done_run() {
+	LOG_DEBUG("done_run entered");
+	state = DONE;
+	probe_size = probed_size;
+	ptb_mtu_limit = probed_size;
+	start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
+	LOG_DEBUG("leave done_run");
+}
+
+static void done_probe_acked() {
+	LOG_DEBUG("done_probe_acked entered");
+	if (validation_count < MAX_VALIDATION) {
+		start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
+	} else {
+		search_run();
+	}
+	LOG_DEBUG("leave done_probe_acked");
+}
+
+static void done_probe_failed() {
+	LOG_DEBUG("done_probe_failed entered");
+	base_run();
+	LOG_DEBUG("leave done_probe_failed");
+}
+
+static void done_ptb_received(uint32_t ptb_mtu) {
+	LOG_DEBUG("done_ptb_received entered");
+	if (ptb_mtu < probed_size) {
+		base_run();
+	}
+	LOG_DEBUG("leave done_ptb_received");
+}
+
+
+void dplpmtud_ptb_received(uint32_t ptb_mtu) {
+	LOG_DEBUG("dplpmtud_ptb_received entered");
+	LOG_INFO_("PTB with MTU %u received", ptb_mtu);
+	if (state_ptb_received_table[state] != NULL) {
+		if (ptb_mtu_limit == 0 || ptb_mtu < ptb_mtu_limit) {
+			LOG_INFO("handle PTB");
+			stop_timer(probe_timer);
+		}
+		(*state_ptb_received_table[state])(ptb_mtu);
+	} else {
+		LOG_INFO("ignore PTB");
+	}
+	LOG_DEBUG("leave dplpmtud_ptb_received");
+}
+
+void dplpmtud_probe_acked() {
+	LOG_DEBUG("dplpmtud_probe_acked entered");
+	stop_timer(probe_timer);
+	LOG_INFO_("probe with %u acked", probe_size);
+	(*state_probe_acked_table[state])();
+	// call state_run
+	LOG_DEBUG("leave dplpmtud_probe_acked");
+}
+
+static void on_probe_timer_expired(void *arg) {
+	LOG_DEBUG("on_probe_timer_expired entered");
+	if (probe_count == MAX_PROBES) {
+		LOG_INFO_("probe with %u failed", probe_size);
+		(*state_probe_failed_table[state])();
+	} else {
+		send_probe();
+	}
+	LOG_DEBUG("leave on_probe_timer_expired");
+}
+
+static void on_validation_timer_expired(void *arg) {
+	LOG_DEBUG("on_validation_timer_expired entered");
+	validation_count++;
+	probe_count = 0;
+	send_probe();
+	LOG_DEBUG("leave on_validation_timer_expired");
+}
+
+void dplpmtud_start_prober(int socket) {
+	LOG_DEBUG("dplpmtud_start_prober entered");
 	int mtu;
 	
+	dplpmtud_socket = socket;
+	
+	probe_timer = create_timer(&on_probe_timer_expired, NULL, "probe timer");
+	validation_timer = create_timer(&on_validation_timer_expired, NULL, "validation timer");
+	
+	max_pmtu = 1500;
 	mtu = get_local_if_mtu(dplpmtud_socket);
 	if (mtu <= 0) {
 		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", max_pmtu);
@@ -312,11 +366,8 @@ void *dplpmtud_prober(void *arg) {
 		}
 	}
 	
-	state = START;
-	while (state != DISABLED) {
-		state = run_state(state);
-	}
-	
-	LOG_DEBUG_("%s - leave prober", THREAD_NAME);
-	return NULL;
+	ptb_mtu_limit = 0;
+	probe_sequence_number = 0;
+	start_run();
+	LOG_DEBUG("leave dplpmtud_start_prober");
 }

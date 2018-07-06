@@ -109,30 +109,30 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am__client_SOURCES_DIST = client.c socket.c dplpmtud.c \
-	dplpmtud_listener.c dplpmtud_prober.c dplpmtud_ptb_listener.c \
-	dplpmtud_pl_udp.c dplpmtud_util.c dplpmtud_util_linux.c \
-	dplpmtud_util_freebsd.c dplpmtud_util_osx.c
+am__client_SOURCES_DIST = client.c socket.c cblib.c dplpmtud.c \
+	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \
+	dplpmtud_util.c dplpmtud_util_linux.c dplpmtud_util_freebsd.c \
+	dplpmtud_util_osx.c
 #am__objects_1 = dplpmtud_util_linux.$(OBJEXT)
 am__objects_2 = dplpmtud_util_freebsd.$(OBJEXT)
 #am__objects_3 = dplpmtud_util_osx.$(OBJEXT)
-am_client_OBJECTS = client.$(OBJEXT) socket.$(OBJEXT) \
-	dplpmtud.$(OBJEXT) dplpmtud_listener.$(OBJEXT) \
-	dplpmtud_prober.$(OBJEXT) dplpmtud_ptb_listener.$(OBJEXT) \
-	dplpmtud_pl_udp.$(OBJEXT) dplpmtud_util.$(OBJEXT) \
-	$(am__objects_1) $(am__objects_2) $(am__objects_3)
+am_client_OBJECTS = client.$(OBJEXT) socket.$(OBJEXT) cblib.$(OBJEXT) \
+	dplpmtud.$(OBJEXT) dplpmtud_prober.$(OBJEXT) \
+	dplpmtud_ptb_handler.$(OBJEXT) dplpmtud_pl_udp.$(OBJEXT) \
+	dplpmtud_util.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3)
 client_OBJECTS = $(am_client_OBJECTS)
 client_LDADD = $(LDADD)
 client_DEPENDENCIES =
-am__server_SOURCES_DIST = server.c socket.c dplpmtud.c \
-	dplpmtud_listener.c dplpmtud_prober.c dplpmtud_ptb_listener.c \
-	dplpmtud_pl_udp.c dplpmtud_util.c dplpmtud_util_linux.c \
-	dplpmtud_util_freebsd.c dplpmtud_util_osx.c
-am_server_OBJECTS = server.$(OBJEXT) socket.$(OBJEXT) \
-	dplpmtud.$(OBJEXT) dplpmtud_listener.$(OBJEXT) \
-	dplpmtud_prober.$(OBJEXT) dplpmtud_ptb_listener.$(OBJEXT) \
-	dplpmtud_pl_udp.$(OBJEXT) dplpmtud_util.$(OBJEXT) \
-	$(am__objects_1) $(am__objects_2) $(am__objects_3)
+am__server_SOURCES_DIST = server.c socket.c cblib.c dplpmtud.c \
+	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \
+	dplpmtud_util.c dplpmtud_util_linux.c dplpmtud_util_freebsd.c \
+	dplpmtud_util_osx.c
+am_server_OBJECTS = server.$(OBJEXT) socket.$(OBJEXT) cblib.$(OBJEXT) \
+	dplpmtud.$(OBJEXT) dplpmtud_prober.$(OBJEXT) \
+	dplpmtud_ptb_handler.$(OBJEXT) dplpmtud_pl_udp.$(OBJEXT) \
+	dplpmtud_util.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3)
 server_OBJECTS = $(am_server_OBJECTS)
 server_LDADD = $(LDADD)
 server_DEPENDENCIES =
@@ -287,14 +287,15 @@ top_srcdir = ..
 AM_CFLAGS = -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal \
 	-Wshadow -Wpointer-arith -Wunreachable-code -Winit-self \
 	-Wno-unused-function -Wno-unused-parameter \
-	-Wno-unreachable-code $(am__append_1) $(am__append_2)
+	-Wno-unreachable-code -DLOG_LEVEL=0x80 $(am__append_1) \
+	$(am__append_2)
 LDADD = -lpthread
-client_SOURCES = client.c socket.c dplpmtud.c dplpmtud_listener.c \
-	dplpmtud_prober.c dplpmtud_ptb_listener.c dplpmtud_pl_udp.c \
+client_SOURCES = client.c socket.c cblib.c dplpmtud.c \
+	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \
 	dplpmtud_util.c $(am__append_3) $(am__append_5) \
 	$(am__append_7)
-server_SOURCES = server.c socket.c dplpmtud.c dplpmtud_listener.c \
-	dplpmtud_prober.c dplpmtud_ptb_listener.c dplpmtud_pl_udp.c \
+server_SOURCES = server.c socket.c cblib.c dplpmtud.c \
+	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \
 	dplpmtud_util.c $(am__append_4) $(am__append_6) \
 	$(am__append_8)
 all: all-am
@@ -387,12 +388,12 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/cblib.Po
 include ./$(DEPDIR)/client.Po
 include ./$(DEPDIR)/dplpmtud.Po
-include ./$(DEPDIR)/dplpmtud_listener.Po
 include ./$(DEPDIR)/dplpmtud_pl_udp.Po
 include ./$(DEPDIR)/dplpmtud_prober.Po
-include ./$(DEPDIR)/dplpmtud_ptb_listener.Po
+include ./$(DEPDIR)/dplpmtud_ptb_handler.Po
 include ./$(DEPDIR)/dplpmtud_util.Po
 include ./$(DEPDIR)/dplpmtud_util_freebsd.Po
 include ./$(DEPDIR)/dplpmtud_util_linux.Po
