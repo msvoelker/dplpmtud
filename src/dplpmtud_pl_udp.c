@@ -35,7 +35,7 @@ static uint32_t token = 4711;
 
 // message specific 
 int dplpmtud_send_probe(int socket, uint32_t probe_size) {
-	LOG_DEBUG("send_probe entered");
+	LOG_DEBUG("dplpmtud_send_probe entered");
 	
 	char *udp_payload;
 	struct udp_heartbeat *heartbeat_request;
@@ -55,7 +55,7 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size) {
 	heartbeat_request->seq_no = get_probe_sequence_number();
 	heartbeat_request->token = token;
 	
-	LOG_DEBUG("leave send_probe");
+	LOG_DEBUG("leave dplpmtud_send_probe");
 	return send(socket, (const void *) udp_payload, udp_payload_size, 0);
 }
 
@@ -93,7 +93,7 @@ static int send_heartbeat_response(struct udp_heartbeat *heartbeat_request, int 
 
 // message specific 
 int dplpmtud_message_handler(int socket, void *message, size_t message_length, struct sockaddr *from_addr, socklen_t from_addr_len) {
-	LOG_DEBUG("message_handler entered");
+	LOG_DEBUG("dplpmtud_message_handler entered");
 	struct udp_heartbeat *heartbeat;
 	
 	if (message_length < 12) {
@@ -120,7 +120,7 @@ int dplpmtud_message_handler(int socket, void *message, size_t message_length, s
 		return handle_heartbeat_response(heartbeat);
 	}
 	
-	LOG_DEBUG("leave message_handler");
+	LOG_DEBUG("leave dplpmtud_message_handler");
 	return -1;
 	
 }

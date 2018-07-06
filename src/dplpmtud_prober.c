@@ -123,12 +123,12 @@ uint32_t get_probe_sequence_number() {
 
 static void send_probe() {
 	LOG_DEBUG("send_probe entered");
+	probe_sequence_number++;
 	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
 	if (dplpmtud_send_probe(dplpmtud_socket, probe_size) < 0) {
 		LOG_PERROR("dplpmtud_send_probe");
 		(*state_probe_failed_table[state])();
 	} else {
-		probe_sequence_number++;
 		probe_count++;
 		start_timer(probe_timer, PROBE_TIMEOUT*1000);
 	}
