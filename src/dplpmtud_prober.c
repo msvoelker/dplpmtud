@@ -273,7 +273,6 @@ static void done_run() {
 
 static void done_probe_acked() {
 	LOG_DEBUG("done_probe_acked entered");
-	stop_timer(validation_timer);
 	if (validation_count < MAX_VALIDATION) {
 		start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
 	} else {
@@ -284,7 +283,6 @@ static void done_probe_acked() {
 
 static void done_probe_failed() {
 	LOG_DEBUG("done_probe_failed entered");
-	stop_timer(validation_timer);
 	base_run();
 	LOG_DEBUG("leave done_probe_failed");
 }
