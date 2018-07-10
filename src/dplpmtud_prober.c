@@ -377,12 +377,14 @@ int dplpmtud_start_prober(int socket) {
 	int val = 1;
 	if (dplpmtud_ip_version == IPv4) {
 		if (set_ip_dont_fragment_option(dplpmtud_socket) != 0) {
-			LOG_PERROR("setsockopt IP_DONTFRAG");
+			LOG_PERROR("set_ip_dont_fragment_option");
+			disabled_run();
 			return -1;
 		}
 	} else {
 		if (setsockopt(dplpmtud_socket, IPPROTO_IPV6, IPV6_DONTFRAG, &val, sizeof(val)) != 0) {
 			LOG_PERROR("setsockopt IPV6_DONTFRAG");
+			disabled_run();
 			return -1;
 		}
 	}
