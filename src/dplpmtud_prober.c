@@ -218,6 +218,7 @@ static void base_ptb_received(uint32_t ptb_mtu) {
 static void search_run() {
 	LOG_DEBUG("search_run entered");
 	state = SEARCH;
+	probed_size = probe_size;
 	update_max_pmtu();
 	increase_probe_size();
 	ptb_mtu_limit = probe_size;
@@ -291,6 +292,7 @@ static void done_run() {
 	state = DONE;
 	probe_size = probed_size;
 	ptb_mtu_limit = probed_size;
+	validation_count = 0;
 	start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
 	LOG_DEBUG("leave done_run");
 }
