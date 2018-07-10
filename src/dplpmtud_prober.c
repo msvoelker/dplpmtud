@@ -234,6 +234,7 @@ static void search_probe_acked() {
 		done_run();
 	} else {
 		increase_probe_size();
+		ptb_mtu_limit = probe_size;
 		probe_count = 0;
 		send_probe();
 	}
