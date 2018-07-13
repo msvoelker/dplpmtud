@@ -40,6 +40,7 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size) {
 	char *udp_payload;
 	struct udp_heartbeat *heartbeat_request;
 	size_t udp_payload_size;
+	ssize_t send_return;
 	
 	if (probe_size < (IP_HEADER_SIZE + UDP_HEADER_SIZE + sizeof(struct udp_heartbeat))) {
 		udp_payload_size = sizeof(struct udp_heartbeat);
@@ -55,8 +56,10 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size) {
 	heartbeat_request->seq_no = get_probe_sequence_number();
 	heartbeat_request->token = token;
 	
+	send_return = send(socket, (const void *) udp_payload, udp_payload_size, 0);
+	free(udp_payload);
 	LOG_DEBUG("leave dplpmtud_send_probe");
-	return send(socket, (const void *) udp_payload, udp_payload_size, 0);
+	return send_return;
 }
 
 // message specific 
