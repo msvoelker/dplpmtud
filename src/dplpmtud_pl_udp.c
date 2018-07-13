@@ -120,7 +120,7 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 		if (local_mtu > 0) {
 			heartbeat_respone->flags |= FLAG_IF_MTU;
 			heartbeat_respone_packet = (struct udp_heartbeat_packet *) heartbeat_respone;
-			heartbeat_respone_packet->data = local_mtu;
+			heartbeat_respone_packet->data = htonl(local_mtu);
 		} else {
 			LOG_ERROR("Could not fetch local interface MTU");
 			length = sizeof(struct udp_heartbeat_header);

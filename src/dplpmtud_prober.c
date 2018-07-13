@@ -330,7 +330,10 @@ static void done_ptb_received(uint32_t ptb_mtu) {
 
 
 void dplpmtud_remote_if_mtu_received(int mtu) {
+	LOG_DEBUG("dplpmtud_remote_if_mtu_received entered");
 	remote_if_mtu = mtu;
+	LOG_DEBUG_("remote_if_mtu=%d", remote_if_mtu);
+	LOG_DEBUG("leave dplpmtud_remote_if_mtu_received");
 }
 
 void dplpmtud_ptb_received(uint32_t ptb_mtu) {
