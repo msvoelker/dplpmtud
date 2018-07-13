@@ -105,6 +105,7 @@ static uint32_t probe_sequence_number;
 static uint32_t ptb_mtu_limit;
 static uint32_t probe_count;
 static uint32_t validation_count;
+static int remote_if_mtu;
 static state_t state;
 static struct timer *probe_timer;
 static struct timer *validation_timer;
@@ -121,11 +122,11 @@ uint32_t get_probe_sequence_number() {
 	return probe_sequence_number;
 }
 
-static void send_probe() {
+static void send_probe(int flags) {
 	LOG_DEBUG("send_probe entered");
 	probe_sequence_number++;
 	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
-	if (dplpmtud_send_probe(dplpmtud_socket, probe_size) < 0) {
+	if (dplpmtud_send_probe(dplpmtud_socket, probe_size, flags) < 0) {
 		LOG_PERROR("dplpmtud_send_probe");
 		(*state_probe_failed_table[state])();
 	} else {
@@ -136,20 +137,23 @@ static void send_probe() {
 }
 
 void update_max_pmtu() {
-	int mtu;
+	int if_mtu;
 	
 	current_max_pmtu = 1500;
-	mtu = get_local_if_mtu(dplpmtud_socket);
-	if (mtu <= 0) {
+	if_mtu = get_local_if_mtu(dplpmtud_socket);
+	if (if_mtu <= 0) {
 		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", current_max_pmtu);
+		return;
+	}
+	if (0 < remote_if_mtu && remote_if_mtu < if_mtu) {
+		if_mtu = remote_if_mtu;
+	}
+	if (MAX_PMTU < if_mtu) {
+		current_max_pmtu = MAX_PMTU;
+		LOG_INFO_("current_max_pmtu = MAX_PMTU = %d", current_max_pmtu);
 	} else {
-		if (MAX_PMTU < mtu) {
-			current_max_pmtu = MAX_PMTU;
-			LOG_INFO_("current_max_pmtu = MAX_PMTU = %d", current_max_pmtu);
-		} else {
-			current_max_pmtu = mtu;
-			LOG_INFO_("current_max_pmtu = mtu of local interface = %d", current_max_pmtu);
-		}
+		current_max_pmtu = if_mtu;
+		LOG_INFO_("current_max_pmtu = min(local_if_mtu, remote_if_mtu) = %d", current_max_pmtu);
 	}
 }
 
@@ -164,9 +168,11 @@ static void disabled_run() {
 static void start_run() {
 	LOG_DEBUG("start_run entered");
 	state = START;
+	remote_if_mtu = 0;
 	probe_size = 0;
 	probe_count = 0;
-	send_probe();
+	send_probe(1);
+	update_max_pmtu();
 	LOG_DEBUG("leave start_run");
 }
 
@@ -188,7 +194,7 @@ static void base_run() {
 	state = BASE;
 	probe_size = BASE_PMTU;
 	probe_count = 0;
-	send_probe();
+	send_probe(0);
 	LOG_DEBUG("leave base_run");
 }
 
@@ -219,11 +225,10 @@ static void search_run() {
 	LOG_DEBUG("search_run entered");
 	state = SEARCH;
 	probed_size = probe_size;
-	update_max_pmtu();
 	increase_probe_size();
 	ptb_mtu_limit = probe_size;
 	probe_count = 0;
-	send_probe();
+	send_probe(0);
 	LOG_DEBUG("leave search_run");
 }
 
@@ -236,7 +241,7 @@ static void search_probe_acked() {
 		increase_probe_size();
 		ptb_mtu_limit = probe_size;
 		probe_count = 0;
-		send_probe();
+		send_probe(0);
 	}
 	LOG_DEBUG("leave search_probe_acked");
 }
@@ -258,7 +263,7 @@ static void search_ptb_received(uint32_t ptb_mtu) {
 			done_run();
 		} else {
 			probe_count = 0;
-			send_probe();
+			send_probe(0);
 		}
 	}
 	LOG_DEBUG("leave search_ptb_received");
@@ -270,7 +275,7 @@ static void error_run() {
 	state = ERROR;
 	probe_size = MIN_PMTU;
 	probe_count = 0;
-	send_probe();
+	send_probe(0);
 	LOG_DEBUG("leave error_run");
 }
 
@@ -283,7 +288,7 @@ static void error_probe_acked() {
 static void error_probe_failed() {
 	LOG_DEBUG("error_probe_failed entered");
 	probe_count = 0;
-	send_probe();
+	send_probe(0);
 	LOG_DEBUG("leave error_probe_failed");
 }
 
@@ -303,6 +308,7 @@ static void done_probe_acked() {
 	if (validation_count < MAX_VALIDATION) {
 		start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
 	} else {
+		update_max_pmtu();
 		search_run();
 	}
 	LOG_DEBUG("leave done_probe_acked");
@@ -322,6 +328,10 @@ static void done_ptb_received(uint32_t ptb_mtu) {
 	LOG_DEBUG("leave done_ptb_received");
 }
 
+
+void dplpmtud_remote_if_mtu_received(int mtu) {
+	remote_if_mtu = mtu;
+}
 
 void dplpmtud_ptb_received(uint32_t ptb_mtu) {
 	LOG_DEBUG("dplpmtud_ptb_received entered");
@@ -353,7 +363,7 @@ static void on_probe_timer_expired(void *arg) {
 		LOG_INFO_("probe with %u failed", probe_size);
 		(*state_probe_failed_table[state])();
 	} else {
-		send_probe();
+		send_probe(0);
 	}
 	LOG_DEBUG("leave on_probe_timer_expired");
 }
@@ -362,7 +372,12 @@ static void on_validation_timer_expired(void *arg) {
 	LOG_DEBUG("on_validation_timer_expired entered");
 	validation_count++;
 	probe_count = 0;
-	send_probe();
+	if (validation_count < MAX_VALIDATION) {
+		send_probe(0);
+	} else {
+		remote_if_mtu = 0;
+		send_probe(1);
+	}
 	LOG_DEBUG("leave on_validation_timer_expired");
 }
 
@@ -374,7 +389,6 @@ int dplpmtud_start_prober(int socket) {
 	probe_timer = create_timer(&on_probe_timer_expired, NULL, "probe timer");
 	validation_timer = create_timer(&on_validation_timer_expired, NULL, "validation timer");
 	
-	update_max_pmtu();
 	int val = 1;
 	if (dplpmtud_ip_version == IPv4) {
 		if (set_ip_dont_fragment_option(dplpmtud_socket) != 0) {
