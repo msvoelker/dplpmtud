@@ -1,7 +1,16 @@
 bin_PROGRAMS = client server
 
+# from logger.h
+LOG_LEVEL_NOLOG	= 0xff
+LOG_LEVEL_ERROR	= 0xa0
+LOG_LEVEL_WARN	= 0x80
+LOG_LEVEL_INFO	= 0x60
+LOG_LEVEL_DEBUG	= 0x40
+LOG_LEVEL_TRACE	= 0x20
+LOG_LEVEL_ALL		= 0x00
+
 AM_CFLAGS = -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal -Wshadow -Wpointer-arith -Wunreachable-code -Winit-self -Wno-unused-function -Wno-unused-parameter -Wno-unreachable-code
-#AM_CFLAGS += -DLOG_LEVEL=0x80
+AM_CFLAGS += -DLOG_LEVEL=LOG_LEVEL_DEBUG
 
 if !LINUX
   AM_CFLAGS += -std=c11

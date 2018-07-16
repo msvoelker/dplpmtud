@@ -19,7 +19,6 @@
 #include <netinet/ip6.h>
 
 #define IPv4_HEADER_SIZE 20
-// TODO assuming a fix IPv6 header size OK?
 #define IPv6_HEADER_SIZE 40
 #define IP_HEADER_SIZE ((dplpmtud_ip_version == IPv4) ? IPv4_HEADER_SIZE : IPv6_HEADER_SIZE)
 #define UDP_HEADER_SIZE 8
@@ -42,7 +41,7 @@ struct udp_heartbeat_packet {
 static uint32_t token = 4711;
 
 int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
-	LOG_DEBUG("dplpmtud_send_probe entered");
+	LOG_TRACE_ENTER
 	
 	char *udp_payload;
 	struct udp_heartbeat_header *heartbeat_request;
@@ -66,33 +65,34 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
 	
 	send_return = send(socket, (const void *) udp_payload, udp_payload_size, 0);
 	free(udp_payload);
-	LOG_DEBUG("leave dplpmtud_send_probe");
+	LOG_TRACE_LEAVE
 	return send_return;
 }
 
 static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_response) {
-	LOG_DEBUG("handle_heartbeat_response entered");
+	LOG_TRACE_ENTER
 	uint32_t seq_no;
 	struct udp_heartbeat_packet *heartbeat_response_packet;
 	
 	seq_no = get_probe_sequence_number();
-	LOG_DEBUG_("heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
 	if (heartbeat_response->token == token && heartbeat_response->seq_no == seq_no) {
 		if ((heartbeat_response->flags & FLAG_IF_MTU) && ntohs(heartbeat_response->length) == sizeof(struct udp_heartbeat_packet)) {
 			heartbeat_response_packet = (struct udp_heartbeat_packet *) heartbeat_response;
 			dplpmtud_remote_if_mtu_received(ntohl(heartbeat_response_packet->data));
 		}
 		dplpmtud_probe_acked();
-		LOG_DEBUG("leave handle_heartbeat_response");
+		LOG_TRACE_LEAVE
 		return 1;
+	} else {
+		LOG_DEBUG_("token or sequence number does not match. Correct values are token=%u, seq_no=%u", token, seq_no);
 	}
-	LOG_DEBUG("leave handle_heartbeat_response");
+	LOG_TRACE_LEAVE
 	return 0;
 }
 
 
 static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_request, int socket, struct sockaddr *to_addr, socklen_t to_addr_len) {
-	LOG_DEBUG("send_heartbeat_response entered");
+	LOG_TRACE_ENTER
 	struct udp_heartbeat_packet heartbeat_respone;
 	int local_mtu;
 	uint16_t length;
@@ -117,44 +117,44 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 	}
 	heartbeat_respone.header.length = htons(length);
 	
-	LOG_DEBUG("leave send_heartbeat_response");
+	LOG_TRACE_LEAVE
 	return sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
 }
 
 int dplpmtud_message_handler(int socket, void *message, size_t message_length, struct sockaddr *from_addr, socklen_t from_addr_len) {
-	LOG_DEBUG("dplpmtud_message_handler entered");
+	LOG_TRACE_ENTER
 	struct udp_heartbeat_header *heartbeat;
 	
 	if (message_length < 12) {
 		LOG_ERROR("message is too small for a heartbeat");
-		LOG_DEBUG("leave message_handler");
+		LOG_TRACE_LEAVE
 		return -1;
 	}
 	heartbeat = (struct udp_heartbeat_header *)message;
-	LOG_DEBUG_("heartbeat type: %u, length: %u received", heartbeat->type, ntohs(heartbeat->length));
+	LOG_DEBUG_("heartbeat type=%u, flags=%u, length=%u, token=%u, seq_no=%u received", heartbeat->type, heartbeat->flags, ntohs(heartbeat->length), heartbeat->token, heartbeat->seq_no);
 	
 	if (message_length < ntohs(heartbeat->length)) {
 		LOG_ERROR_("heartbeat length does not fit. %hu, %zu", ntohs(heartbeat->length), message_length);
-		LOG_DEBUG("leave message_handler");
+		LOG_TRACE_LEAVE
 		return -1;
 	}
 	
 	if (heartbeat->type == 4) { /* heartbeat request */
 		if (ntohs(heartbeat->length) == 12) {
-			LOG_DEBUG("leave message_handler");
+			LOG_TRACE_LEAVE
 			return send_heartbeat_response(heartbeat, socket, from_addr, from_addr_len);
 		}
 		LOG_ERROR_("heartbeat request is not 12 bytes long. %hu", ntohs(heartbeat->length));
 	} else if (heartbeat->type == 5) { /* heartbeat response */
 		if ((!(heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == sizeof(struct udp_heartbeat_header))
 		  || ((heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == sizeof(struct udp_heartbeat_packet))) {
-			LOG_DEBUG("leave message_handler");
+			LOG_TRACE_LEAVE
 			return handle_heartbeat_response(heartbeat);
 		}
 		LOG_ERROR_("heartbeat response with incorrect length. %hu %d", ntohs(heartbeat->length), (heartbeat->flags & FLAG_IF_MTU));
 	}
 	
-	LOG_DEBUG("leave dplpmtud_message_handler");
+	LOG_TRACE_LEAVE
 	return -1;
 }
 

@@ -123,7 +123,7 @@ uint32_t get_probe_sequence_number() {
 }
 
 static void send_probe(int flags) {
-	LOG_DEBUG("send_probe entered");
+	LOG_TRACE_ENTER
 	probe_sequence_number++;
 	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
 	if (dplpmtud_send_probe(dplpmtud_socket, probe_size, flags) < 0) {
@@ -135,7 +135,7 @@ static void send_probe(int flags) {
 		probe_count++;
 		start_timer(probe_timer, PROBE_TIMEOUT*1000);
 	}
-	LOG_DEBUG("leave send_probe");
+	LOG_TRACE_LEAVE
 }
 
 void update_max_pmtu() {
@@ -162,69 +162,69 @@ void update_max_pmtu() {
 
 
 static void disabled_run() {
-	LOG_DEBUG("disabled_run entered");
+	LOG_TRACE_ENTER
 	state = DISABLED;
-	LOG_DEBUG("leave disabled_run");
+	LOG_TRACE_LEAVE
 }
 
 
 static void start_run() {
-	LOG_DEBUG("start_run entered");
+	LOG_TRACE_ENTER
 	state = START;
 	probe_size = 0;
 	probe_count = 0;
 	send_probe(0);
-	LOG_DEBUG("leave start_run");
+	LOG_TRACE_LEAVE
 }
 
 static void start_probe_acked() {
-	LOG_DEBUG("start_probe_acked entered");
+	LOG_TRACE_ENTER
 	base_run();
-	LOG_DEBUG("leave start_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void start_probe_failed() {
-	LOG_DEBUG("start_probe_failed entered");
+	LOG_TRACE_ENTER
 	disabled_run();
-	LOG_DEBUG("leave start_probe_failed");
+	LOG_TRACE_LEAVE
 }
 
 
 static void base_run() {
-	LOG_DEBUG("base_run entered");
+	LOG_TRACE_ENTER
 	state = BASE;
 	probe_size = BASE_PMTU;
 	probe_count = 0;
 	remote_if_mtu = 0;
 	send_probe(1);
-	LOG_DEBUG("leave base_run");
+	LOG_TRACE_LEAVE
 }
 
 static void base_probe_acked() {
-	LOG_DEBUG("base_probe_acked entered");
+	LOG_TRACE_ENTER
 	search_run();
-	LOG_DEBUG("leave base_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void base_probe_failed() {
-	LOG_DEBUG("base_probe_failed entered");
+	LOG_TRACE_ENTER
 	error_run();
-	LOG_DEBUG("leave base_probe_failed");
+	LOG_TRACE_LEAVE
 }
 
 static void base_ptb_received(uint32_t ptb_mtu) {
-	LOG_DEBUG("base_ptb_received entered");
+	LOG_TRACE_ENTER
 	if (ptb_mtu < BASE_PMTU) {
 		error_run();
 	} else {
 		done_run();
 	}
-	LOG_DEBUG("leave base_ptb_received");
+	LOG_TRACE_LEAVE
 }
 
 
 static void search_run() {
-	LOG_DEBUG("search_run entered");
+	LOG_TRACE_ENTER
 	state = SEARCH;
 	update_max_pmtu();
 	probed_size = probe_size;
@@ -232,11 +232,11 @@ static void search_run() {
 	ptb_mtu_limit = probe_size;
 	probe_count = 0;
 	send_probe(0);
-	LOG_DEBUG("leave search_run");
+	LOG_TRACE_LEAVE
 }
 
 static void search_probe_acked() {
-	LOG_DEBUG("search_probe_acked entered");
+	LOG_TRACE_ENTER
 	probed_size = probe_size;
 	if (probed_size == current_max_pmtu) {
 		done_run();
@@ -246,17 +246,17 @@ static void search_probe_acked() {
 		probe_count = 0;
 		send_probe(0);
 	}
-	LOG_DEBUG("leave search_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void search_probe_failed() {
-	LOG_DEBUG("search_probe_failed entered");
+	LOG_TRACE_ENTER
 	done_run();
-	LOG_DEBUG("leave search_probe_failed");
+	LOG_TRACE_LEAVE
 }
 
 static void search_ptb_received(uint32_t ptb_mtu) {
-	LOG_DEBUG("search_ptb_received entered");
+	LOG_TRACE_ENTER
 	if (ptb_mtu < probed_size) {
 		base_run();
 	} else if (ptb_mtu < probe_size) {
@@ -269,78 +269,78 @@ static void search_ptb_received(uint32_t ptb_mtu) {
 			send_probe(0);
 		}
 	}
-	LOG_DEBUG("leave search_ptb_received");
+	LOG_TRACE_LEAVE
 }
 
 
 static void error_run() {
-	LOG_DEBUG("error_run entered");
+	LOG_TRACE_ENTER
 	state = ERROR;
 	probe_size = MIN_PMTU;
 	probe_count = 0;
 	remote_if_mtu = 0;
 	send_probe(1);
-	LOG_DEBUG("leave error_run");
+	LOG_TRACE_LEAVE
 }
 
 static void error_probe_acked() {
-	LOG_DEBUG("error_probe_acked entered");
+	LOG_TRACE_ENTER
 	search_run();
-	LOG_DEBUG("leave error_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void error_probe_failed() {
-	LOG_DEBUG("error_probe_failed entered");
+	LOG_TRACE_ENTER
 	probe_count = 0;
 	send_probe(0);
-	LOG_DEBUG("leave error_probe_failed");
+	LOG_TRACE_LEAVE
 }
 
 
 static void done_run() {
-	LOG_DEBUG("done_run entered");
+	LOG_TRACE_ENTER
 	state = DONE;
 	probe_size = probed_size;
 	ptb_mtu_limit = probed_size;
 	validation_count = 0;
 	start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
-	LOG_DEBUG("leave done_run");
+	LOG_TRACE_LEAVE
 }
 
 static void done_probe_acked() {
-	LOG_DEBUG("done_probe_acked entered");
+	LOG_TRACE_ENTER
 	if (validation_count < MAX_VALIDATION) {
 		start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
 	} else {
 		search_run();
 	}
-	LOG_DEBUG("leave done_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void done_probe_failed() {
-	LOG_DEBUG("done_probe_failed entered");
+	LOG_TRACE_ENTER
 	base_run();
-	LOG_DEBUG("leave done_probe_failed");
+	LOG_TRACE_LEAVE
 }
 
 static void done_ptb_received(uint32_t ptb_mtu) {
-	LOG_DEBUG("done_ptb_received entered");
+	LOG_TRACE_ENTER
 	if (ptb_mtu < probed_size) {
 		base_run();
 	}
-	LOG_DEBUG("leave done_ptb_received");
+	LOG_TRACE_LEAVE
 }
 
 
 void dplpmtud_remote_if_mtu_received(int mtu) {
-	LOG_DEBUG("dplpmtud_remote_if_mtu_received entered");
+	LOG_TRACE_ENTER
 	remote_if_mtu = mtu;
 	LOG_DEBUG_("remote_if_mtu=%d", remote_if_mtu);
-	LOG_DEBUG("leave dplpmtud_remote_if_mtu_received");
+	LOG_TRACE_LEAVE
 }
 
 void dplpmtud_ptb_received(uint32_t ptb_mtu) {
-	LOG_DEBUG("dplpmtud_ptb_received entered");
+	LOG_TRACE_ENTER
 	LOG_INFO_("PTB with MTU %u received", ptb_mtu);
 	if (state_ptb_received_table[state] != NULL) {
 		if (ptb_mtu_limit == 0 || ptb_mtu < ptb_mtu_limit) {
@@ -351,21 +351,21 @@ void dplpmtud_ptb_received(uint32_t ptb_mtu) {
 	} else {
 		LOG_INFO("ignore PTB");
 	}
-	LOG_DEBUG("leave dplpmtud_ptb_received");
+	LOG_TRACE_LEAVE
 }
 
 void dplpmtud_probe_acked() {
-	LOG_DEBUG("dplpmtud_probe_acked entered");
+	LOG_TRACE_ENTER
 	stop_timer(probe_timer);
 	LOG_INFO_("probe with %u acked", probe_size);
 	if (state_probe_acked_table[state] != NULL) {
 		(*state_probe_acked_table[state])();
 	}
-	LOG_DEBUG("leave dplpmtud_probe_acked");
+	LOG_TRACE_LEAVE
 }
 
 static void on_probe_timer_expired(void *arg) {
-	LOG_DEBUG("on_probe_timer_expired entered");
+	LOG_TRACE_ENTER
 	if (probe_count == MAX_PROBES) {
 		LOG_INFO_("probe with %u failed", probe_size);
 		if (state_probe_failed_table[state] != NULL) {
@@ -374,11 +374,11 @@ static void on_probe_timer_expired(void *arg) {
 	} else {
 		send_probe(0);
 	}
-	LOG_DEBUG("leave on_probe_timer_expired");
+	LOG_TRACE_LEAVE
 }
 
 static void on_validation_timer_expired(void *arg) {
-	LOG_DEBUG("on_validation_timer_expired entered");
+	LOG_TRACE_ENTER
 	validation_count++;
 	probe_count = 0;
 	if (validation_count < MAX_VALIDATION) {
@@ -387,11 +387,11 @@ static void on_validation_timer_expired(void *arg) {
 		remote_if_mtu = 0;
 		send_probe(1);
 	}
-	LOG_DEBUG("leave on_validation_timer_expired");
+	LOG_TRACE_LEAVE
 }
 
 int dplpmtud_start_prober(int socket) {
-	LOG_DEBUG("dplpmtud_start_prober entered");
+	LOG_TRACE_ENTER
 	
 	dplpmtud_socket = socket;
 	
@@ -417,6 +417,6 @@ int dplpmtud_start_prober(int socket) {
 	probe_sequence_number = 0;
 	remote_if_mtu = 0;
 	start_run();
-	LOG_DEBUG("leave dplpmtud_start_prober");
+	LOG_TRACE_LEAVE
 	return 0;
 }

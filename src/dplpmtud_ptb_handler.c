@@ -53,7 +53,7 @@ int dplpmtud_ptb_handler_init(int dplpmtud_socket) {
 }
 
 static void ptb4_handler(char *buf, ssize_t recv_len) {
-	LOG_DEBUG("ptb4_handler entered");
+	LOG_TRACE_ENTER
 	struct ip *ip_header;
 	struct icmp *icmp_header;
 	
@@ -84,11 +84,11 @@ static void ptb4_handler(char *buf, ssize_t recv_len) {
 		dplpmtud_ptb_received(ntohs(icmp_header->icmp_hun.ih_pmtu.ipm_nextmtu));
 	}
 	
-	LOG_DEBUG("leave ptb4_handler");
+	LOG_TRACE_LEAVE
 }
 
 static void ptb6_handler(char *buf, ssize_t recv_len) {
-	LOG_DEBUG("ptb6_handler entered");
+	LOG_TRACE_ENTER
 	struct icmp6_hdr *icmp6_header;
 
 	icmp6_header = (struct icmp6_hdr *)buf;
@@ -101,7 +101,7 @@ static void ptb6_handler(char *buf, ssize_t recv_len) {
 		dplpmtud_ptb_received(ntohl(icmp6_header->icmp6_mtu));
 	}
 	
-	LOG_DEBUG("leave ptb6_handler");
+	LOG_TRACE_LEAVE
 }
 
 void dplpmtud_icmp_socket_readable(void *arg) {

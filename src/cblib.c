@@ -33,12 +33,15 @@
  * Version 1.5 Bug fix in handling fd. Don't use the fd as the index.
  * Version 1.6 Bug fix in the first argument of select()
  */
- #define DEBUG 1
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "logger.h"
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
+#define DEBUG 1
+#endif
 #ifdef DEBUG
 #include <stdio.h>
 #endif

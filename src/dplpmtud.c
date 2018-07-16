@@ -13,7 +13,7 @@
 #include "dplpmtud_pl.h"
 
 // TODO: increase probe_size better
-// TODO: implement DISABLED state
+// TODO assuming a fix IP header size in dplpmtud_pl_udp OK?
 
 #define BUFFER_SIZE (1<<16)
 
@@ -24,7 +24,7 @@ static int dplpmtud_passive_mode;
 static int dplpmtud_handle_ptb;
 
 void dplpmtud_socket_readable(void *arg) {
-	LOG_DEBUG("dplpmtud_socket_readable entered");
+	LOG_TRACE_ENTER
 	ssize_t recv_len;
 	char buf[BUFFER_SIZE];
 	struct sockaddr_storage from_addr;
@@ -39,11 +39,11 @@ void dplpmtud_socket_readable(void *arg) {
 		dplpmtud_message_handler(dplpmtud_socket, buf, recv_len, (struct sockaddr *)&from_addr, from_addr_len);
 	}
 	
-	LOG_DEBUG("leave dplpmtud_socket_readable");
+	LOG_TRACE_LEAVE
 }
 
 static void *controller(void *arg) {
-	LOG_DEBUG("controller entered");
+	LOG_TRACE_ENTER
 	int icmp_socket;
 	
 	init_cblib();
@@ -70,15 +70,16 @@ static void *controller(void *arg) {
 	}
 	handle_events();
 	
+	LOG_TRACE_LEAVE
 	return 0;
 }
 
 pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int handle_ptb) {
-	LOG_DEBUG("dplpmtud_start entered");
+	LOG_TRACE_ENTER
 	if (dplpmtud_thread_id != 0) {
 		// dplpmtud thread already started
 		LOG_INFO("dplpmtud thread already started");
-		LOG_DEBUG("leave dplpmtud_start");
+		LOG_TRACE_LEAVE
 		return 0;
 	}
 	if (address_family == AF_INET) {
@@ -87,7 +88,7 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 		dplpmtud_ip_version = IPv6;
 	} else {
 		LOG_ERROR("unknown address family");
-		LOG_DEBUG("leave dplpmtud_start");
+		LOG_TRACE_LEAVE
 		return 0;
 	}
 	dplpmtud_socket = socket;
@@ -100,14 +101,14 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 	}
 	
 	pthread_create(&dplpmtud_thread_id, NULL, controller, NULL);
-	LOG_DEBUG("leave dplpmtud_start");
+	LOG_TRACE_LEAVE
 	return dplpmtud_thread_id;
 }
 
 void dplpmtud_wait() {
-	LOG_DEBUG("dplpmtud_wait entered");
+	LOG_TRACE_ENTER
 	if (dplpmtud_thread_id != 0) {
 		pthread_join(dplpmtud_thread_id, NULL);
 	}
-	LOG_DEBUG("leave dplpmtud_wait");
+	LOG_TRACE_LEAVE
 }
