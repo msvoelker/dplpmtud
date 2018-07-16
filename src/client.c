@@ -7,11 +7,27 @@
 
 int main(int argc, char **argv) {
 	struct addrinfo addr_hints;
-	int socket;
 	struct addrinfo addressInfos;
+	char *host;
+	char *port;
+	int socket;
+	int handle_ptb;
 	
-	if (argc < 3) {
-		fprintf(stderr, "call %s host port\n", argv[0]);
+	handle_ptb = 0;
+	if (argc == 3) {
+		host = argv[1];
+		port = argv[2];
+	} else if (argc == 4) {
+		if (strcmp(argv[1], "--handle-ptb") == 0) {
+			handle_ptb = 1;
+		} else {
+			fprintf(stderr, "unknown option %s\n", argv[1]);
+			return 1;
+		}
+		host = argv[2];
+		port = argv[3];
+	} else {
+		fprintf(stderr, "call %s [--handle-ptb] host port\n", argv[0]);
 		return 1;
 	}
 	
@@ -19,12 +35,12 @@ int main(int argc, char **argv) {
 	addr_hints.ai_family = AF_UNSPEC;
 	addr_hints.ai_socktype = SOCK_DGRAM;
 
-	socket = create_socket(0, argv[1], argv[2], &addr_hints, &addressInfos, sizeof(struct addrinfo));
+	socket = create_socket(0, host, port, &addr_hints, &addressInfos, sizeof(struct addrinfo));
 	if (socket < 0) {
 		fprintf(stderr, "could not create socket\n");
 		return 1;
 	}
-	dplpmtud_start(socket, addressInfos.ai_family, 0, 1);
+	dplpmtud_start(socket, addressInfos.ai_family, 0, handle_ptb);
 	dplpmtud_wait();
 	
 	close(socket);
