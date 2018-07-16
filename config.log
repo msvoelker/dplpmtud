@@ -289,6 +289,7 @@ target_alias=''
 #define VERSION "1.0"
 
 configure: exit 0
+<<<<<<< HEAD
 
 ## ---------------------- ##
 ## Running config.status. ##
@@ -364,3 +365,5 @@ on bsdhead2
 
 config.status:856: creating src/Makefile
 config.status:1085: executing depfiles commands
+=======
+>>>>>>> master
