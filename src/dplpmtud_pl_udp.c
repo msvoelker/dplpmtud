@@ -80,7 +80,7 @@ static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_resp
 	seq_no = get_probe_sequence_number();
 	LOG_DEBUG_("heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
 	if (heartbeat_response->token == token && heartbeat_response->seq_no == seq_no) {
-		if ((heartbeat_response->flags & FLAG_IF_MTU) && heartbeat_response->length == sizeof(struct udp_heartbeat_packet)) {
+		if ((heartbeat_response->flags & FLAG_IF_MTU) && ntohs(heartbeat_response->length) == sizeof(struct udp_heartbeat_packet)) {
 			heartbeat_response_packet = (struct udp_heartbeat_packet *) heartbeat_response;
 			dplpmtud_remote_if_mtu_received(ntohl(heartbeat_response_packet->data));
 		}
@@ -96,41 +96,32 @@ static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_resp
 // message specific 
 static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_request, int socket, struct sockaddr *to_addr, socklen_t to_addr_len) {
 	LOG_DEBUG("send_heartbeat_response entered");
-	size_t length;
-	struct udp_heartbeat_header *heartbeat_respone;
-	struct udp_heartbeat_packet *heartbeat_respone_packet;
+	struct udp_heartbeat_packet heartbeat_respone;
 	int local_mtu;
-	ssize_t sendto_return;
+	uint16_t length;
 	
-	if (heartbeat_request->flags & FLAG_IF_MTU) {
-		length = sizeof(struct udp_heartbeat_packet);
-	} else {
-		length = sizeof(struct udp_heartbeat_header);
-	}
-	heartbeat_respone = (struct udp_heartbeat_header *) malloc(length);
+	memset(&heartbeat_respone, 0, sizeof(struct udp_heartbeat_packet));
+	heartbeat_respone.header.type = 5;
+	heartbeat_respone.header.flags = 0;
+	length = 12;
+	heartbeat_respone.header.seq_no = heartbeat_request->seq_no;
+	heartbeat_respone.header.token = heartbeat_request->token;
 	
-	memset(heartbeat_respone, 0, length);
-	heartbeat_respone->type = 5;
-	heartbeat_respone->seq_no = heartbeat_request->seq_no;
-	heartbeat_respone->token = heartbeat_request->token;
 	if (heartbeat_request->flags & FLAG_IF_MTU) {
 		local_mtu = get_local_if_mtu(socket);
 		LOG_DEBUG_("local_mtu: %d", local_mtu);
 		if (local_mtu > 0) {
-			heartbeat_respone->flags |= FLAG_IF_MTU;
-			heartbeat_respone_packet = (struct udp_heartbeat_packet *) heartbeat_respone;
-			heartbeat_respone_packet->data = htonl(local_mtu);
+			heartbeat_respone.header.flags |= FLAG_IF_MTU;
+			length = 16;
+			heartbeat_respone.data = htonl(local_mtu);
 		} else {
 			LOG_ERROR("Could not fetch local interface MTU");
-			length = sizeof(struct udp_heartbeat_header);
 		}
 	}
-	heartbeat_respone->length = htons(length);
+	heartbeat_respone.header.length = htons(length);
 	
-	sendto_return = sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
-	free(heartbeat_respone);
 	LOG_DEBUG("leave send_heartbeat_response");
-	return sendto_return;
+	return sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
 }
 
 // message specific 

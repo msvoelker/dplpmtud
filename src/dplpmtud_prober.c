@@ -168,16 +168,15 @@ static void disabled_run() {
 static void start_run() {
 	LOG_DEBUG("start_run entered");
 	state = START;
-	remote_if_mtu = 0;
 	probe_size = 0;
 	probe_count = 0;
 	send_probe(1);
-	update_max_pmtu();
 	LOG_DEBUG("leave start_run");
 }
 
 static void start_probe_acked() {
 	LOG_DEBUG("start_probe_acked entered");
+	update_max_pmtu();
 	base_run();
 	LOG_DEBUG("leave start_probe_acked");
 }
@@ -409,6 +408,8 @@ int dplpmtud_start_prober(int socket) {
 	
 	ptb_mtu_limit = 0;
 	probe_sequence_number = 0;
+	remote_if_mtu = 0;
+	update_max_pmtu();
 	start_run();
 	LOG_DEBUG("leave dplpmtud_start_prober");
 	return 0;
