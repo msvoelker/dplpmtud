@@ -72,15 +72,15 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
 }
 
 // message specific 
-static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_response, size_t length) {
+static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_response) {
+	LOG_DEBUG("handle_heartbeat_response entered");
 	uint32_t seq_no;
 	struct udp_heartbeat_packet *heartbeat_response_packet;
 	
 	seq_no = get_probe_sequence_number();
-	LOG_DEBUG("handle_heartbeat_response entered");
 	LOG_DEBUG_("heartbeat_response->token: %u, token: %u heartbeat_response->seq_no: %u, probe_sequence_number: %u", heartbeat_response->token, token, heartbeat_response->seq_no, seq_no);
 	if (heartbeat_response->token == token && heartbeat_response->seq_no == seq_no) {
-		if ((heartbeat_response->flags & FLAG_IF_MTU) && length >= sizeof(struct udp_heartbeat_packet)) {
+		if ((heartbeat_response->flags & FLAG_IF_MTU) && heartbeat_response->length == sizeof(struct udp_heartbeat_packet)) {
 			heartbeat_response_packet = (struct udp_heartbeat_packet *) heartbeat_response;
 			dplpmtud_remote_if_mtu_received(ntohl(heartbeat_response_packet->data));
 		}
@@ -107,16 +107,15 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 	} else {
 		length = sizeof(struct udp_heartbeat_header);
 	}
-	
 	heartbeat_respone = (struct udp_heartbeat_header *) malloc(length);
 	
-	memset(&heartbeat_respone, 0, length);
+	memset(heartbeat_respone, 0, length);
 	heartbeat_respone->type = 5;
-	heartbeat_respone->length = htons(12);
 	heartbeat_respone->seq_no = heartbeat_request->seq_no;
 	heartbeat_respone->token = heartbeat_request->token;
 	if (heartbeat_request->flags & FLAG_IF_MTU) {
 		local_mtu = get_local_if_mtu(socket);
+		LOG_DEBUG_("local_mtu: %d", local_mtu);
 		if (local_mtu > 0) {
 			heartbeat_respone->flags |= FLAG_IF_MTU;
 			heartbeat_respone_packet = (struct udp_heartbeat_packet *) heartbeat_respone;
@@ -126,6 +125,7 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 			length = sizeof(struct udp_heartbeat_header);
 		}
 	}
+	heartbeat_respone->length = htons(length);
 	
 	sendto_return = sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
 	free(heartbeat_respone);
@@ -144,27 +144,31 @@ int dplpmtud_message_handler(int socket, void *message, size_t message_length, s
 		return -1;
 	}
 	heartbeat = (struct udp_heartbeat_header *)message;
+	LOG_DEBUG_("heartbeat type: %u, length: %u received", heartbeat->type, ntohs(heartbeat->length));
 	
-	if (ntohs(heartbeat->length) != 12) {
-		LOG_ERROR_("heartbeat length is not 12 byte. %hu", heartbeat->length);
+	if (message_length < ntohs(heartbeat->length)) {
+		LOG_ERROR_("heartbeat length does not fit. %hu, %zu", ntohs(heartbeat->length), message_length);
 		LOG_DEBUG("leave message_handler");
 		return -1;
 	}
 	
-	LOG_DEBUG_("heartbeat type: %u, length: %u received", heartbeat->type, ntohs(heartbeat->length));
-	if (heartbeat->type == 4) {
-		// heartbeat request
-		LOG_DEBUG("leave message_handler");
-		return send_heartbeat_response(heartbeat, socket, from_addr, from_addr_len);
-	} else if (heartbeat->type == 5) {
-		// valid heartbeat response
-		LOG_DEBUG("leave message_handler");
-		return handle_heartbeat_response(heartbeat, message_length);
+	if (heartbeat->type == 4) { /* heartbeat request */
+		if (ntohs(heartbeat->length) == 12) {
+			LOG_DEBUG("leave message_handler");
+			return send_heartbeat_response(heartbeat, socket, from_addr, from_addr_len);
+		}
+		LOG_ERROR_("heartbeat request is not 12 bytes long. %hu", ntohs(heartbeat->length));
+	} else if (heartbeat->type == 5) { /* heartbeat response */
+		if ((!(heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == 12)
+		  || ((heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == 16)) {
+			LOG_DEBUG("leave message_handler");
+			return handle_heartbeat_response(heartbeat);
+		}
+		LOG_ERROR_("heartbeat response with incorrect length. %hu %d", ntohs(heartbeat->length), (heartbeat->flags & FLAG_IF_MTU));
 	}
 	
 	LOG_DEBUG("leave dplpmtud_message_handler");
 	return -1;
-	
 }
 
 int verify_ptb_token(void *udp_payload, size_t payload_length) {

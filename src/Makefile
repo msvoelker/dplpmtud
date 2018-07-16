@@ -89,6 +89,7 @@ POST_UNINSTALL = :
 build_triplet = x86_64-unknown-freebsd12.0
 host_triplet = x86_64-unknown-freebsd12.0
 bin_PROGRAMS = client$(EXEEXT) server$(EXEEXT)
+#AM_CFLAGS += -DLOG_LEVEL=0x80
 am__append_1 = -std=c11
 #am__append_2 = -D__APPLE_USE_RFC_3542
 #am__append_3 = dplpmtud_util_linux.c
@@ -287,8 +288,7 @@ top_srcdir = ..
 AM_CFLAGS = -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal \
 	-Wshadow -Wpointer-arith -Wunreachable-code -Winit-self \
 	-Wno-unused-function -Wno-unused-parameter \
-	-Wno-unreachable-code -DLOG_LEVEL=0x80 $(am__append_1) \
-	$(am__append_2)
+	-Wno-unreachable-code $(am__append_1) $(am__append_2)
 LDADD = -lpthread
 client_SOURCES = client.c socket.c cblib.c dplpmtud.c \
 	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \

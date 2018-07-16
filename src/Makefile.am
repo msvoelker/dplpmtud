@@ -1,7 +1,7 @@
 bin_PROGRAMS = client server
 
 AM_CFLAGS = -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal -Wshadow -Wpointer-arith -Wunreachable-code -Winit-self -Wno-unused-function -Wno-unused-parameter -Wno-unreachable-code
-AM_CFLAGS += -DLOG_LEVEL=0x80
+#AM_CFLAGS += -DLOG_LEVEL=0x80
 
 if !LINUX
   AM_CFLAGS += -std=c11
