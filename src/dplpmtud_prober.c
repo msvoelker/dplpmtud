@@ -128,7 +128,9 @@ static void send_probe(int flags) {
 	LOG_INFO_("probe %u bytes with seq_no= %u", probe_size, probe_sequence_number);
 	if (dplpmtud_send_probe(dplpmtud_socket, probe_size, flags) < 0) {
 		LOG_PERROR("dplpmtud_send_probe");
-		(*state_probe_failed_table[state])();
+		if (state_probe_failed_table[state] != NULL) {
+			(*state_probe_failed_table[state])();
+		}
 	} else {
 		probe_count++;
 		start_timer(probe_timer, PROBE_TIMEOUT*1000);
@@ -355,8 +357,9 @@ void dplpmtud_probe_acked() {
 	LOG_DEBUG("dplpmtud_probe_acked entered");
 	stop_timer(probe_timer);
 	LOG_INFO_("probe with %u acked", probe_size);
-	(*state_probe_acked_table[state])();
-	// call state_run
+	if (state_probe_acked_table[state] != NULL) {
+		(*state_probe_acked_table[state])();
+	}
 	LOG_DEBUG("leave dplpmtud_probe_acked");
 }
 
@@ -364,7 +367,9 @@ static void on_probe_timer_expired(void *arg) {
 	LOG_DEBUG("on_probe_timer_expired entered");
 	if (probe_count == MAX_PROBES) {
 		LOG_INFO_("probe with %u failed", probe_size);
-		(*state_probe_failed_table[state])();
+		if (state_probe_failed_table[state] != NULL) {
+			(*state_probe_failed_table[state])();
+		}
 	} else {
 		send_probe(0);
 	}
