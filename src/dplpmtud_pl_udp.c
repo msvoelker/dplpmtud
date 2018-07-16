@@ -41,7 +41,6 @@ struct udp_heartbeat_packet {
 
 static uint32_t token = 4711;
 
-// message specific 
 int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
 	LOG_DEBUG("dplpmtud_send_probe entered");
 	
@@ -71,7 +70,6 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
 	return send_return;
 }
 
-// message specific 
 static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_response) {
 	LOG_DEBUG("handle_heartbeat_response entered");
 	uint32_t seq_no;
@@ -93,7 +91,6 @@ static int handle_heartbeat_response(struct udp_heartbeat_header *heartbeat_resp
 }
 
 
-// message specific 
 static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_request, int socket, struct sockaddr *to_addr, socklen_t to_addr_len) {
 	LOG_DEBUG("send_heartbeat_response entered");
 	struct udp_heartbeat_packet heartbeat_respone;
@@ -124,7 +121,6 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 	return sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
 }
 
-// message specific 
 int dplpmtud_message_handler(int socket, void *message, size_t message_length, struct sockaddr *from_addr, socklen_t from_addr_len) {
 	LOG_DEBUG("dplpmtud_message_handler entered");
 	struct udp_heartbeat_header *heartbeat;
@@ -150,8 +146,8 @@ int dplpmtud_message_handler(int socket, void *message, size_t message_length, s
 		}
 		LOG_ERROR_("heartbeat request is not 12 bytes long. %hu", ntohs(heartbeat->length));
 	} else if (heartbeat->type == 5) { /* heartbeat response */
-		if ((!(heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == 12)
-		  || ((heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == 16)) {
+		if ((!(heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == sizeof(struct udp_heartbeat_header))
+		  || ((heartbeat->flags & FLAG_IF_MTU) && ntohs(heartbeat->length) == sizeof(struct udp_heartbeat_packet))) {
 			LOG_DEBUG("leave message_handler");
 			return handle_heartbeat_response(heartbeat);
 		}

@@ -170,13 +170,12 @@ static void start_run() {
 	state = START;
 	probe_size = 0;
 	probe_count = 0;
-	send_probe(1);
+	send_probe(0);
 	LOG_DEBUG("leave start_run");
 }
 
 static void start_probe_acked() {
 	LOG_DEBUG("start_probe_acked entered");
-	update_max_pmtu();
 	base_run();
 	LOG_DEBUG("leave start_probe_acked");
 }
@@ -193,7 +192,8 @@ static void base_run() {
 	state = BASE;
 	probe_size = BASE_PMTU;
 	probe_count = 0;
-	send_probe(0);
+	remote_if_mtu = 0;
+	send_probe(1);
 	LOG_DEBUG("leave base_run");
 }
 
@@ -223,6 +223,7 @@ static void base_ptb_received(uint32_t ptb_mtu) {
 static void search_run() {
 	LOG_DEBUG("search_run entered");
 	state = SEARCH;
+	update_max_pmtu();
 	probed_size = probe_size;
 	increase_probe_size();
 	ptb_mtu_limit = probe_size;
@@ -274,7 +275,8 @@ static void error_run() {
 	state = ERROR;
 	probe_size = MIN_PMTU;
 	probe_count = 0;
-	send_probe(0);
+	remote_if_mtu = 0;
+	send_probe(1);
 	LOG_DEBUG("leave error_run");
 }
 
@@ -307,7 +309,6 @@ static void done_probe_acked() {
 	if (validation_count < MAX_VALIDATION) {
 		start_timer(validation_timer, VALIDATION_TIMEOUT*1000);
 	} else {
-		update_max_pmtu();
 		search_run();
 	}
 	LOG_DEBUG("leave done_probe_acked");
@@ -409,7 +410,6 @@ int dplpmtud_start_prober(int socket) {
 	ptb_mtu_limit = 0;
 	probe_sequence_number = 0;
 	remote_if_mtu = 0;
-	update_max_pmtu();
 	start_run();
 	LOG_DEBUG("leave dplpmtud_start_prober");
 	return 0;
