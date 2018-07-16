@@ -8,6 +8,9 @@ States in the state machine (see IETF draft).
 **local interface MTU**
 MTU of the local interface that is used to send the probes.
 
+**remote interface MTU**
+MTU of remote peers interface that is used to receive the probes.
+
 **PMTU**
 The actual path MTU
 
@@ -22,15 +25,27 @@ ICMP Packet Too Big message. A PTB can be the ICMPv6 Packet Too Big or the ICMPv
 
 ## Tests
 
-**Test 1**
+**Test 1a**
 
-* condition: local interface MTU = PMTU >= BASE_PMTU 
+* condition: local interface MTU = remote interface MTU = PMTU >= BASE_PMTU 
 * expected behavior:
  * successful probes in START and BASE. 
  * In SEARCH, increase until probed_size = PMTU and switch to DONE.
 * result: probed_size = PMTU
 
-**Test 2**
+**Test 1b**
+
+* condition: local interface MTU > remote interface MTU = PMTU >= BASE_PMTU 
+* expected behavior: same as in Test 1a
+* result: same as in Test 1a
+
+**Test 1c**
+
+* condition: remote interface MTU > local interface MTU = PMTU >= BASE_PMTU 
+* expected behavior: same as in Test 1a
+* result: same as in Test 1a
+
+**Test 2a**
 
 * condition: local interface MTU = PMTU < BASE_PMTU (IPv4 only)
 * expected behavior: 
@@ -40,10 +55,19 @@ ICMP Packet Too Big message. A PTB can be the ICMPv6 Packet Too Big or the ICMPv
  * In SEARCH, increase until probes_size = PMTU and switch to DONE.
 * result: probed_size = PMTU 
 
+**Test 2b**
+
+* condition: 
+ * remote interface MTU = PMTU < BASE_PMTU (IPv4 only)
+ * PTBs not handled
+* expected behavior: same as in Test2a
+* result: same as in Test2a
+
 **Test 3**
 
 * condition:
  * local interface MTU > PMTU
+ * remote interface MTU > PMTU
  * PTBs not handled
 * expected behavior:
  * successful probes in START and BASE. 
@@ -56,7 +80,9 @@ ICMP Packet Too Big message. A PTB can be the ICMPv6 Packet Too Big or the ICMPv
 
 * condition: 
  * local interface MTU > PMTU
- * PTBs handled but too short to validate (IPv4 only).
+ * remote interface MTU > PMTU
+ * PTBs handled
+ * PTB too short to validate (IPv4 only).
 * expected behavior: same as Test 3
 * result: same as Test 3
 
@@ -64,21 +90,25 @@ ICMP Packet Too Big message. A PTB can be the ICMPv6 Packet Too Big or the ICMPv
 
 * condition
  * local interface MTU > PMTU
- * PTBs handled long enough for validation.
+ * remote interface MTU > PMTU
+ * PTBs handled
+ * PTB long enough for validation.
 * expected behavior
  * successful probes in START and BASE. 
- * In SEARCH, increase until PMTU < probe_size <= local interface MTU, which
+ * In SEARCH, increase until PMTU < probe_size <= interface MTUs, which
 generates a ICMP PTB message.
  * PTB sets max_pmtu to PTB_MTU. 
  * If probe with PTB_MTU succeeds -> switch to DONE 
- * Otherwise -> New PTB.
+ * Otherwise -> new PTB.
 * result: probed_size = PMTU 
 
 **Test 6**
 
 * condition
  * local interface MTU > PMTU
- * PTBs handled but not received.
+ * remote interface MTU > PMTU
+ * PTBs handled
+ * No PTB received.
 * expected behavior
  * successful probes in START and BASE. 
  * In SEARCH, increase until probed_size <= PMTU < probe_size 
@@ -89,8 +119,9 @@ generates a ICMP PTB message.
 
 * condition
  * local interface MTU > PMTU
+ * remote interface MTU > PMTU
  * PMTU changes to PMTU' while in DONE, 
- * PMTU < PMTU' < local interface MTU
+ * PMTU < PMTU' < interface MTUs
 * expected behavior
  * successful probes in START and BASE. 
  * In SEARCH, increase until probed_size <= PMTU < probe_size 
