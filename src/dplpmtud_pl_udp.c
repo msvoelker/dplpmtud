@@ -63,7 +63,7 @@ int dplpmtud_send_probe(int socket, uint32_t probe_size, int flags) {
 	heartbeat_request->seq_no = get_probe_sequence_number();
 	heartbeat_request->token = token;
 	
-	LOG_DEBUG_("send heartbeat request with type=%u, flags=%u, length=%u, token=%u, seq_no=%u received", heartbeat_request->type, heartbeat_request->flags, ntohs(heartbeat_request->length), heartbeat_request->token, heartbeat_request->seq_no);
+	LOG_DEBUG_("send heartbeat request with type=%u, flags=%u, length=%u, token=%u, seq_no=%u", heartbeat_request->type, heartbeat_request->flags, ntohs(heartbeat_request->length), heartbeat_request->token, heartbeat_request->seq_no);
 	send_return = send(socket, (const void *) udp_payload, udp_payload_size, 0);
 	free(udp_payload);
 	LOG_TRACE_LEAVE
@@ -118,7 +118,7 @@ static int send_heartbeat_response(struct udp_heartbeat_header *heartbeat_reques
 	}
 	heartbeat_respone.header.length = htons(length);
 	
-	LOG_DEBUG_("send heartbeat response with type=%u, flags=%u, length=%u, token=%u, seq_no=%u received", heartbeat_respone.header.type, heartbeat_respone.header.flags, ntohs(heartbeat_respone.header.length), heartbeat_respone.header.token, heartbeat_respone.header.seq_no);
+	LOG_DEBUG_("send heartbeat response with type=%u, flags=%u, length=%u, token=%u, seq_no=%u", heartbeat_respone.header.type, heartbeat_respone.header.flags, ntohs(heartbeat_respone.header.length), heartbeat_respone.header.token, heartbeat_respone.header.seq_no);
 	LOG_TRACE_LEAVE
 	return sendto(socket, (const void *)&heartbeat_respone, length, 0, to_addr, to_addr_len);
 }
