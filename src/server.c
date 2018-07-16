@@ -20,6 +20,10 @@ int main(int argc, char **argv) {
 	addr_hints.ai_socktype = SOCK_DGRAM;
 	
 	socket = create_socket(1, argv[1], argv[2], &addr_hints, &addressInfos, sizeof(struct addrinfo));
+	if (socket < 0) {
+		fprintf(stderr, "could not create socket\n");
+		return 1;
+	}
 	dplpmtud_start(socket, addressInfos.ai_family, 1, 0);
 	dplpmtud_wait();
 	

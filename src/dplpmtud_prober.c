@@ -144,8 +144,8 @@ void update_max_pmtu() {
 	if_mtu = get_local_if_mtu(dplpmtud_socket);
 	if (if_mtu <= 0) {
 		LOG_ERROR("failed to get local interface MTU.");
-	}
-	if (if_mtu <= 0 || (0 < remote_if_mtu && remote_if_mtu < if_mtu)) {
+		if_mtu = remote_if_mtu;
+	} else if (0 < remote_if_mtu && remote_if_mtu < if_mtu) {
 		if_mtu = remote_if_mtu;
 	}
 	if (if_mtu <= 0) {
