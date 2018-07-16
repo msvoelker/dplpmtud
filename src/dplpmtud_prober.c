@@ -141,16 +141,17 @@ static void send_probe(int flags) {
 void update_max_pmtu() {
 	int if_mtu;
 	
-	current_max_pmtu = 1500;
 	if_mtu = get_local_if_mtu(dplpmtud_socket);
 	if (if_mtu <= 0) {
-		LOG_ERROR_("failed to get local interface MTU. Assume a MTU of %d", current_max_pmtu);
-		return;
+		LOG_ERROR("failed to get local interface MTU.");
 	}
-	if (0 < remote_if_mtu && remote_if_mtu < if_mtu) {
+	if (if_mtu <= 0 || (0 < remote_if_mtu && remote_if_mtu < if_mtu)) {
 		if_mtu = remote_if_mtu;
 	}
-	if (MAX_PMTU < if_mtu) {
+	if (if_mtu <= 0) {
+		current_max_pmtu = 1500;
+		LOG_INFO_("No information about interface MTU. Assume a MTU of %d", current_max_pmtu);
+	} else if (if_mtu > MAX_PMTU) {
 		current_max_pmtu = MAX_PMTU;
 		LOG_INFO_("current_max_pmtu = MAX_PMTU = %d", current_max_pmtu);
 	} else {
