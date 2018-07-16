@@ -89,6 +89,7 @@ POST_UNINSTALL = :
 build_triplet = x86_64-unknown-freebsd12.0
 host_triplet = x86_64-unknown-freebsd12.0
 bin_PROGRAMS = client$(EXEEXT) server$(EXEEXT)
+#AM_CFLAGS += -DLOG_LEVEL=0x80
 am__append_1 = -std=c11
 #am__append_2 = -D__APPLE_USE_RFC_3542
 #am__append_3 = dplpmtud_util_linux.c
@@ -192,12 +193,12 @@ ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/msvoelker/src/dplpmtud/missing aclocal-1.15
+ACLOCAL = ${SHELL} /usr/home/msvoelker/src/dplpmtud/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
-AUTOCONF = ${SHELL} /home/msvoelker/src/dplpmtud/missing autoconf
-AUTOHEADER = ${SHELL} /home/msvoelker/src/dplpmtud/missing autoheader
-AUTOMAKE = ${SHELL} /home/msvoelker/src/dplpmtud/missing automake-1.15
+AUTOCONF = ${SHELL} /usr/home/msvoelker/src/dplpmtud/missing autoconf
+AUTOHEADER = ${SHELL} /usr/home/msvoelker/src/dplpmtud/missing autoheader
+AUTOMAKE = ${SHELL} /usr/home/msvoelker/src/dplpmtud/missing automake-1.15
 AWK = nawk
 CC = cc
 CCDEPMODE = depmode=gcc3
@@ -219,7 +220,7 @@ LDFLAGS =
 LIBOBJS = 
 LIBS = 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/msvoelker/src/dplpmtud/missing makeinfo
+MAKEINFO = ${SHELL} /usr/home/msvoelker/src/dplpmtud/missing makeinfo
 MKDIR_P = .././install-sh -c -d
 OBJEXT = o
 PACKAGE = dplpmtud
@@ -234,10 +235,10 @@ SET_MAKE =
 SHELL = /bin/sh
 STRIP = 
 VERSION = 1.0
-abs_builddir = /home/msvoelker/src/dplpmtud/src
-abs_srcdir = /home/msvoelker/src/dplpmtud/src
-abs_top_builddir = /home/msvoelker/src/dplpmtud
-abs_top_srcdir = /home/msvoelker/src/dplpmtud
+abs_builddir = /usr/home/msvoelker/src/dplpmtud/src
+abs_srcdir = /usr/home/msvoelker/src/dplpmtud/src
+abs_top_builddir = /usr/home/msvoelker/src/dplpmtud
+abs_top_srcdir = /usr/home/msvoelker/src/dplpmtud
 ac_ct_CC = 
 am__include = include
 am__leading_dot = .
@@ -264,7 +265,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/msvoelker/src/dplpmtud/install-sh
+install_sh = ${SHELL} /usr/home/msvoelker/src/dplpmtud/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -287,8 +288,7 @@ top_srcdir = ..
 AM_CFLAGS = -O1 -g -pedantic -Wall -Wextra -Werror -Wfloat-equal \
 	-Wshadow -Wpointer-arith -Wunreachable-code -Winit-self \
 	-Wno-unused-function -Wno-unused-parameter \
-	-Wno-unreachable-code -DLOG_LEVEL=0x80 $(am__append_1) \
-	$(am__append_2)
+	-Wno-unreachable-code $(am__append_1) $(am__append_2)
 LDADD = -lpthread
 client_SOURCES = client.c socket.c cblib.c dplpmtud.c \
 	dplpmtud_prober.c dplpmtud_ptb_handler.c dplpmtud_pl_udp.c \
