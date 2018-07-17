@@ -9,7 +9,9 @@ probing.
 
 ## Supported OS
 
-FreeBSD, Linux (tested with Ubuntu) and macOS (IPv6 only).
+* FreeBSD
+* Linux (tested with Ubuntu)
+* macOS (IPv6 only).
 
 ## Build
 
@@ -27,11 +29,11 @@ Start the server on one host with
 
 and the client on the other host with 
 
-`src/client IP PORT`
+`src/client [--handle-ptb] IP PORT`
 
-For server, IP must be a local IP address. 
-For client, IP must be the servers IP address. In order to handle ICMP PTB 
-messages, client needs superuser privilege.
+For the server, IP must be a local IP address and PORT a local free port the server can listen on. 
+
+For the client, choose the same IP and PORT as chosen for the server. If the client shall handle ICMP PTB messages, add the option --handle-ptb. For this, the client needs superuser privilege.
 
 ## Test cases 
 
