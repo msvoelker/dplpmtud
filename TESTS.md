@@ -29,8 +29,8 @@ ICMP Packet Too Big message. A PTB can be the ICMPv6 Packet Too Big or the ICMPv
 
 * condition: local interface MTU = remote interface MTU = PMTU >= BASE_PMTU 
 * expected behavior:
- * successful probes in START and BASE. 
- * In SEARCH, increase until probed_size = PMTU and switch to DONE.
+  * successful probes in START and BASE. 
+  * In SEARCH, increase until probed_size = PMTU and switch to DONE.
 * result: probed_size = PMTU
 
 **Test 1b**
