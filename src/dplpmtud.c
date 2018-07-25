@@ -20,7 +20,7 @@
 int dplpmtud_socket = 0;
 
 static pthread_t dplpmtud_thread_id = 0;
-static int dplpmtud_passive_mode;
+static int dplpmtud_send_probes;
 static int dplpmtud_handle_ptb;
 
 void dplpmtud_socket_readable(void *arg) {
@@ -49,10 +49,10 @@ static void *controller(void *arg) {
 	init_cblib();
 	
 	register_fd_callback(dplpmtud_socket, &dplpmtud_socket_readable, NULL);
-	if (!dplpmtud_passive_mode) {
+	if (dplpmtud_send_probes) {
 		
 		if (dplpmtud_start_prober(dplpmtud_socket) < 0) {
-			dplpmtud_passive_mode = 1;
+			dplpmtud_send_probes = 0;
 			LOG_ERROR("Could not start prober");
 		} else if (dplpmtud_handle_ptb) {
 			icmp_socket = dplpmtud_ptb_handler_init(dplpmtud_socket);
@@ -74,7 +74,7 @@ static void *controller(void *arg) {
 	return 0;
 }
 
-pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int handle_ptb) {
+pthread_t dplpmtud_start(int socket, int address_family, int send_probes, int handle_ptb) {
 	LOG_TRACE_ENTER
 	if (dplpmtud_thread_id != 0) {
 		// dplpmtud thread already started
@@ -93,11 +93,11 @@ pthread_t dplpmtud_start(int socket, int address_family, int passive_mode, int h
 	}
 	dplpmtud_socket = socket;
 	
-	dplpmtud_passive_mode = passive_mode;
-	if (passive_mode) {
-		dplpmtud_handle_ptb = 0;
-	} else {
+	dplpmtud_send_probes = send_probes;
+	if (send_probes) {
 		dplpmtud_handle_ptb = handle_ptb;
+	} else {
+		dplpmtud_handle_ptb = 0;
 	}
 	
 	pthread_create(&dplpmtud_thread_id, NULL, controller, NULL);

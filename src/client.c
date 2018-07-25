@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "could not create socket\n");
 		return 1;
 	}
-	dplpmtud_start(socket, addressInfos.ai_family, 0, handle_ptb);
+	dplpmtud_start(socket, addressInfos.ai_family, 1, handle_ptb);
 	dplpmtud_wait();
 	
 	close(socket);

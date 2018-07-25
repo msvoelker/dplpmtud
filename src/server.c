@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "could not create socket\n");
 		return 1;
 	}
-	dplpmtud_start(socket, addressInfos.ai_family, 1, 0);
+	dplpmtud_start(socket, addressInfos.ai_family, 0, 0);
 	dplpmtud_wait();
 	
 	close(socket);
