@@ -35,6 +35,8 @@ For the server, IP must be a local IP address and PORT a local free port the ser
 
 For the client, choose the same IP and PORT as chosen for the server. If the client shall handle ICMP PTB messages, add the option --handle-ptb. For this, the client needs superuser privilege.
 
-## Test cases 
+## See also 
 
-see [TESTS.md](TESTS.md)
+Test scenarios [TESTS.md](TESTS.md).
+
+Documentation [DOC.md](DOC.md).
